@@ -3,7 +3,6 @@ package command
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/tidwall/resp"
@@ -33,7 +32,6 @@ func ParseCommand(rawMsg string) (Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("Read %s\n", v.Type())
 		if v.Type() == resp.Array {
 			switch v.Array()[0].String() {
 			case CommandSet:
