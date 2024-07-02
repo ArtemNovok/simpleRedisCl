@@ -1,14 +1,19 @@
 package Mypeer
 
-import "net"
+import (
+	"fmt"
+	"net"
+)
 
 type TCPPeer struct {
-	conn net.Conn
+	conn  net.Conn
+	msgCh chan []byte
 }
 
-func NewTCPPeer(conn net.Conn) *TCPPeer {
+func NewTCPPeer(conn net.Conn, msgch chan []byte) *TCPPeer {
 	return &TCPPeer{
-		conn: conn,
+		conn:  conn,
+		msgCh: msgch,
 	}
 }
 
@@ -17,5 +22,15 @@ func (t *TCPPeer) Addr() string {
 }
 
 func (t *TCPPeer) ReadLoop() error {
-	return nil
+	const op = "peer.ReadLoop"
+	buf := make([]byte, 1024)
+	for {
+		n, err := t.conn.Read(buf)
+		if err != nil {
+			return fmt.Errorf("%s:%w", op, err)
+		}
+		msgBuf := make([]byte, n)
+		copy(msgBuf, buf[:n])
+		t.msgCh <- msgBuf
+	}
 }
