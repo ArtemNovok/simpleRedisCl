@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -73,20 +74,8 @@ func (s *Server) loop() {
 		select {
 		case rawMsg := <-s.msgCh:
 			log.Info("got new raw message", slog.Int("bytes", len(rawMsg.Payload)))
-			if err := s.handleRawMessage(rawMsg.Payload); err != nil {
+			if err := s.handleRawMessage(rawMsg.From, rawMsg.Payload); err != nil {
 				log.Error("got error while handling raw message", slog.String("error", err.Error()))
-				// blup
-				if peer, ok := s.peers[rawMsg.From]; ok {
-					if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
-						log.Error("failed to write response", slog.String("address", rawMsg.From))
-					}
-				}
-				log.Error("failed to find peer with given address", slog.String("address", rawMsg.From))
-			}
-			if peer, ok := s.peers[rawMsg.From]; ok {
-				if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
-					log.Error("failed to write response", slog.String("address", rawMsg.From))
-				}
 			}
 		case peer := <-s.addPeerCh:
 			log.Info("added new peer", slog.String("peer address", peer.Addr()))
@@ -97,7 +86,50 @@ func (s *Server) loop() {
 		}
 	}
 }
-func (s *Server) handleRawMessage(msg []byte) error {
+func (s *Server) Set(from string, key, val []byte) error {
+	const op = "server.Set"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	// we need peer to write response to client
+	peer, ok := s.peers[from]
+	if !ok {
+		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
+	}
+	err := s.kv.Set(key, val)
+	if err != nil {
+		log.Error("failed to set a key", slog.String("key", string(key)))
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("key is sett")
+	return nil
+}
+
+func (s *Server) Get(from string, key []byte) error {
+	const op = "server.Get"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	peer, ok := s.peers[from]
+	if !ok {
+		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
+	}
+	val, ok := s.kv.Get(key)
+	n := int64(len(val))
+	if !ok {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, storage.ErrKeyDoNotExists)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	binary.Write(peer.Conn, binary.BigEndian, n)
+	r := bytes.NewReader(val)
+	_, err := io.Copy(peer.Conn, r)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	log.Info("key value is find and sended to peer")
+	return nil
+}
+
+func (s *Server) handleRawMessage(from string, msg []byte) error {
 	const op = "server.handleRawMessage"
 	log := s.Log.With("op", op)
 	log.Info("start parsing the commnad")
@@ -108,8 +140,11 @@ func (s *Server) handleRawMessage(msg []byte) error {
 	}
 	switch v := cmd.(type) {
 	case command.SetCommand:
-		return s.kv.Set(v.Key, v.Val)
+		return s.Set(from, v.Key, v.Val)
+	case command.GetCommand:
+		return s.Get(from, v.Key)
 	}
+
 	return nil
 }
 

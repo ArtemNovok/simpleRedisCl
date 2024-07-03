@@ -27,31 +27,37 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// cl2, err := client.New("localhost:6666")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 	go func() {
 		for i := 0; i < 5; i++ {
-			key := fmt.Sprintf("key2%v", i)
+			key := fmt.Sprintf("key2_%v", i)
 			val := fmt.Sprintf("val2%v", i)
 			go func() {
 				err := cl.Set(context.Background(), key, val)
 				if err != nil {
 					fmt.Println(err)
 				}
+				val, err := cl.Get(context.Background(), key)
+				if err != nil {
+					fmt.Println(err)
+				}
+				fmt.Println(val)
 			}()
 		}
 	}()
 
 	for i := 0; i < 5; i++ {
-		key := fmt.Sprintf("key%v", i)
+		key := fmt.Sprintf("key_%v", i)
 		val := fmt.Sprintf("val%v", i)
 		go func() {
 			err := cl.Set(context.Background(), key, val)
 			if err != nil {
 				fmt.Println(err)
 			}
+			val, err := cl.Get(context.Background(), key)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(val)
 		}()
 	}
 	time.Sleep(10 * time.Millisecond)

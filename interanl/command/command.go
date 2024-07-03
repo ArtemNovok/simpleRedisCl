@@ -10,6 +10,7 @@ import (
 
 var (
 	CommandSet                 = "SET"
+	CommandGet                 = "GET"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 )
@@ -20,6 +21,9 @@ type Command interface {
 
 type SetCommand struct {
 	Key, Val []byte
+}
+type GetCommand struct {
+	Key []byte
 }
 
 func ParseCommand(rawMsg string) (Command, error) {
@@ -42,9 +46,16 @@ func ParseCommand(rawMsg string) (Command, error) {
 					Key: v.Array()[1].Bytes(),
 					Val: v.Array()[2].Bytes(),
 				}, nil
+
+			case CommandGet:
+				if len(v.Array()) > 2 {
+					return nil, ErrUnknownCommandArguments
+				}
+				return GetCommand{
+					Key: v.Array()[1].Bytes(),
+				}, nil
 			default:
 				return nil, ErrUnknownCommand
-
 			}
 		}
 	}
