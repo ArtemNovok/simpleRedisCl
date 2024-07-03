@@ -19,7 +19,7 @@ type Command interface {
 }
 
 type SetCommand struct {
-	key, val string
+	Key, Val []byte
 }
 
 func ParseCommand(rawMsg string) (Command, error) {
@@ -39,8 +39,8 @@ func ParseCommand(rawMsg string) (Command, error) {
 					return nil, ErrUnknownCommandArguments
 				}
 				return SetCommand{
-					key: v.Array()[1].String(),
-					val: v.Array()[2].String(),
+					Key: v.Array()[1].Bytes(),
+					Val: v.Array()[2].Bytes(),
 				}, nil
 			default:
 				return nil, ErrUnknownCommand

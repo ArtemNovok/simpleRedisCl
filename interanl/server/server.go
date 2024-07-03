@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -9,10 +10,12 @@ import (
 
 	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
 	Mypeer "github.com/ArtemNovok/simpleRedisCl/interanl/peer"
+	"github.com/ArtemNovok/simpleRedisCl/interanl/storage"
 )
 
-const (
+var (
 	defaultAddress = ":6666"
+	ErrUknownPeer  = errors.New("unknown peer")
 )
 
 type Config struct {
@@ -22,11 +25,12 @@ type Config struct {
 
 type Server struct {
 	Config
-	peers     map[*Mypeer.TCPPeer]bool
+	peers     map[string]*Mypeer.TCPPeer
 	addPeerCh chan *Mypeer.TCPPeer
 	quitCh    chan struct{}
-	msgCh     chan []byte
+	msgCh     chan Mypeer.Message
 	listener  net.Listener
+	kv        *storage.KeyValue
 }
 
 func NewServer(cfg Config) *Server {
@@ -35,13 +39,17 @@ func NewServer(cfg Config) *Server {
 	}
 	return &Server{
 		Config:    cfg,
-		peers:     make(map[*Mypeer.TCPPeer]bool),
+		peers:     make(map[string]*Mypeer.TCPPeer),
 		addPeerCh: make(chan *Mypeer.TCPPeer),
 		quitCh:    make(chan struct{}),
-		msgCh:     make(chan []byte),
+		msgCh:     make(chan Mypeer.Message),
+		kv:        storage.NreKeyValue(),
 	}
 }
 
+func (s *Server) ShowData() {
+	s.Log.Debug("info", slog.Any("data", s.kv.Data))
+}
 func (s *Server) Stop() {
 	close(s.quitCh)
 }
@@ -64,20 +72,31 @@ func (s *Server) loop() {
 	for {
 		select {
 		case rawMsg := <-s.msgCh:
-			log.Info("got new raw message", slog.Int("bytes", len(rawMsg)))
-			if err := s.handleRawMessage(rawMsg); err != nil {
+			log.Info("got new raw message", slog.Int("bytes", len(rawMsg.Payload)))
+			if err := s.handleRawMessage(rawMsg.Payload); err != nil {
 				log.Error("got error while handling raw message", slog.String("error", err.Error()))
+				// blup
+				if peer, ok := s.peers[rawMsg.From]; ok {
+					if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+						log.Error("failed to write response", slog.String("address", rawMsg.From))
+					}
+				}
+				log.Error("failed to find peer with given address", slog.String("address", rawMsg.From))
+			}
+			if peer, ok := s.peers[rawMsg.From]; ok {
+				if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+					log.Error("failed to write response", slog.String("address", rawMsg.From))
+				}
 			}
 		case peer := <-s.addPeerCh:
 			log.Info("added new peer", slog.String("peer address", peer.Addr()))
-			s.peers[peer] = true
+			s.peers[peer.Addr()] = peer
 		case <-s.quitCh:
 			log.Info("server stopped due to Stop func call")
 			return
 		}
 	}
 }
-
 func (s *Server) handleRawMessage(msg []byte) error {
 	const op = "server.handleRawMessage"
 	log := s.Log.With("op", op)
@@ -89,7 +108,7 @@ func (s *Server) handleRawMessage(msg []byte) error {
 	}
 	switch v := cmd.(type) {
 	case command.SetCommand:
-		log.Info("ready to use command", slog.Any("command", v))
+		return s.kv.Set(v.Key, v.Val)
 	}
 	return nil
 }

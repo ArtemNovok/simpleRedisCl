@@ -22,7 +22,28 @@ func main() {
 		log.Fatal(s.Start())
 	}()
 	time.Sleep(1 * time.Second)
-	cl := client.New("localhost:6666")
+	cl, err := client.New("localhost:6666")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// cl2, err := client.New("localhost:6666")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	go func() {
+		for i := 0; i < 5; i++ {
+			key := fmt.Sprintf("key2%v", i)
+			val := fmt.Sprintf("val2%v", i)
+			go func() {
+				err := cl.Set(context.Background(), key, val)
+				if err != nil {
+					fmt.Println(err)
+				}
+			}()
+		}
+	}()
+
 	for i := 0; i < 5; i++ {
 		key := fmt.Sprintf("key%v", i)
 		val := fmt.Sprintf("val%v", i)
@@ -33,6 +54,8 @@ func main() {
 			}
 		}()
 	}
+	time.Sleep(10 * time.Millisecond)
+	s.ShowData()
 	select {}
 }
 

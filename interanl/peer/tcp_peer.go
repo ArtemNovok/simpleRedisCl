@@ -6,31 +6,39 @@ import (
 )
 
 type TCPPeer struct {
-	conn  net.Conn
-	msgCh chan []byte
+	Conn  net.Conn
+	msgCh chan Message
+}
+type Message struct {
+	From    string
+	Payload []byte
 }
 
-func NewTCPPeer(conn net.Conn, msgch chan []byte) *TCPPeer {
+func NewTCPPeer(conn net.Conn, msgch chan Message) *TCPPeer {
 	return &TCPPeer{
-		conn:  conn,
+		Conn:  conn,
 		msgCh: msgch,
 	}
 }
 
 func (t *TCPPeer) Addr() string {
-	return t.conn.RemoteAddr().String()
+	return t.Conn.RemoteAddr().String()
 }
 
 func (t *TCPPeer) ReadLoop() error {
 	const op = "peer.ReadLoop"
 	buf := make([]byte, 1024)
 	for {
-		n, err := t.conn.Read(buf)
+		n, err := t.Conn.Read(buf)
 		if err != nil {
 			return fmt.Errorf("%s:%w", op, err)
 		}
 		msgBuf := make([]byte, n)
 		copy(msgBuf, buf[:n])
-		t.msgCh <- msgBuf
+		msg := Message{
+			From:    t.Addr(),
+			Payload: msgBuf,
+		}
+		t.msgCh <- msg
 	}
 }
