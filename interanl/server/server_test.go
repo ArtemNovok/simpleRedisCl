@@ -56,7 +56,7 @@ func Test_ServerAndClients(t *testing.T) {
 
 }
 
-func Test_TwoClientWritesOneValue(t *testing.T) {
+func Test_TwoClientWriteOneValue(t *testing.T) {
 	logger := setUpLogger()
 	s := SetUpServer(logger)
 	go func() {

@@ -14,12 +14,17 @@ import (
 
 var (
 	ErrOperationFailed = errors.New("operation failed")
+	ErrTimeIsOut       = errors.New("time is out")
 )
 
 type Client struct {
 	addr     string
 	connLock sync.Mutex
 	conn     net.Conn
+}
+type GetResult struct {
+	value string
+	err   error
 }
 
 func New(addr string) (*Client, error) {
@@ -49,15 +54,28 @@ func (c *Client) Set(ctx context.Context, key string, value string) error {
 	if err != nil {
 		return err
 	}
-	var res bool
-	err = binary.Read(c.conn, binary.BigEndian, &res)
-	if err != nil {
-		return err
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+		}
+		if !res {
+			ch <- ErrOperationFailed
+		}
+		ch <- nil
+
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
 	}
-	if !res {
-		return ErrOperationFailed
-	}
-	return nil
 }
 func (c *Client) Get(ctx context.Context, key string) (string, error) {
 	c.connLock.Lock()
@@ -73,8 +91,25 @@ func (c *Client) Get(ctx context.Context, key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	ch := make(chan GetResult)
+	go func() {
+		res, err := c.readResult()
+		ch <- GetResult{
+			value: res,
+			err:   err,
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ErrTimeIsOut
+	case resp := <-ch:
+		return resp.value, resp.err
+	}
+}
+
+func (c *Client) readResult() (string, error) {
 	var res bool
-	err = binary.Read(c.conn, binary.BigEndian, &res)
+	err := binary.Read(c.conn, binary.BigEndian, &res)
 	if err != nil {
 		return "", err
 	}
