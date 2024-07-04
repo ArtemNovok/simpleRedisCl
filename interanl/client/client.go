@@ -126,3 +126,7 @@ func (c *Client) readResult() (string, error) {
 	}
 	return string(valueBuf), nil
 }
+
+func (c *Client) Close() error {
+	return c.conn.Close()
+}
