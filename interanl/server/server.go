@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	defaultAddress = ":6666"
+	DefaultAddress = ":6666"
 	ErrUknownPeer  = errors.New("unknown peer")
 )
 
@@ -36,7 +36,7 @@ type Server struct {
 
 func NewServer(cfg Config) *Server {
 	if len(cfg.ListenAddr) == 0 {
-		cfg.ListenAddr = defaultAddress
+		cfg.ListenAddr = DefaultAddress
 	}
 	return &Server{
 		Config:    cfg,
@@ -49,7 +49,9 @@ func NewServer(cfg Config) *Server {
 }
 
 func (s *Server) ShowData() {
-	s.Log.Debug("info", slog.Any("data", s.kv.Data))
+	for key, val := range s.kv.Data {
+		s.Log.Debug("info", slog.String("key", key), slog.String("value", string(val)))
+	}
 }
 func (s *Server) Stop() {
 	close(s.quitCh)
