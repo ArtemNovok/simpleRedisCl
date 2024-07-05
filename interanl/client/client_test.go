@@ -126,3 +126,15 @@ func Test_ADD_ADDN(t *testing.T) {
 	require.Nil(t, err)
 	fmt.Println(val)
 }
+func Test_Delete(t *testing.T) {
+	cl, err := New("localhost:6666")
+	require.Nil(t, err)
+	key := "one"
+	ctx, _ := context.WithTimeout(context.Background(), 500*time.Microsecond)
+	err = cl.Set(ctx, key, "1")
+	require.Nil(t, err)
+	err = cl.Delete(ctx, key)
+	require.Nil(t, err)
+	_, err = cl.Get(ctx, key)
+	require.NotNil(t, err)
+}

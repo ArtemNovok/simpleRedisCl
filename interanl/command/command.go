@@ -14,6 +14,7 @@ var (
 	CommnadHello               = "HELLO"
 	CommandAdd                 = "ADD"
 	CommandAddN                = "ADDN"
+	CommandDelete              = "DEL"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 )
@@ -37,6 +38,9 @@ type AdddNCommand struct {
 }
 type HelloCommand struct {
 	value string
+}
+type DeleteCommnad struct {
+	Key []byte
 }
 
 func ParseCommand(rawMsg string) (Command, error) {
@@ -81,6 +85,13 @@ func ParseCommand(rawMsg string) (Command, error) {
 				return AdddNCommand{
 					Key: v.Array()[1].Bytes(),
 					Val: v.Array()[2].Bytes(),
+				}, nil
+			case CommandDelete:
+				if len(v.Array()) != 2 {
+					return nil, ErrUnknownCommandArguments
+				}
+				return DeleteCommnad{
+					Key: v.Array()[1].Bytes(),
 				}, nil
 			case CommnadHello:
 				return HelloCommand{

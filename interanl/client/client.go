@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	CommandSet   = "SET"
-	CommandGet   = "GET"
-	CommnadHello = "HELLO"
-	CommandAdd   = "ADD"
-	CommandAddN  = "ADDN"
+	CommandDelete = "DEL"
+	CommandSet    = "SET"
+	CommandGet    = "GET"
+	CommnadHello  = "HELLO"
+	CommandAdd    = "ADD"
+	CommandAddN   = "ADDN"
 	// ErrOperationFailed returned when operation failed not due to context cancel
 	ErrOperationFailed = errors.New("operation failed")
 	// ErrTimeIsOut returned whe operation failed due to context cancel
@@ -46,6 +47,37 @@ func New(addr string) (*Client, error) {
 		addr: addr,
 		conn: conn,
 	}, nil
+}
+func (c *Client) Delete(ctx context.Context, key string) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelete),
+		resp.StringValue(key),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		ch <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
 }
 
 // Set sets key with given value it returns error if ctx is done or operation failed

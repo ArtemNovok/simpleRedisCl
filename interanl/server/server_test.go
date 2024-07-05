@@ -106,12 +106,12 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 			}()
 		}
 	}()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 	close(startChan)
 	wg2.Wait()
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(3 * time.Millisecond)
 	cl.Close()
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(3 * time.Millisecond)
 	require.Equal(t, len(s.peers), 1)
 	s.ShowData()
 }
@@ -163,7 +163,7 @@ func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
 			}()
 		}
 	}()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 	close(startChan)
 	wg.Wait()
 	s.ShowData()
@@ -296,7 +296,7 @@ func Test_FiveClient(t *testing.T) {
 	}()
 	close(startChan)
 	wg.Wait()
-	time.Sleep(600 * time.Millisecond)
+	time.Sleep(6 * time.Millisecond)
 	s.ShowData()
 }
 

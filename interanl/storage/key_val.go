@@ -71,3 +71,9 @@ func (kv *KeyValue) AddN(key []byte, value []byte) error {
 	kv.Data[string(key)] = []byte(strconv.Itoa(intVal))
 	return nil
 }
+func (kv *KeyValue) Delete(key []byte) error {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	delete(kv.Data, string(key))
+	return nil
+}

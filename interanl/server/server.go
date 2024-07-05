@@ -178,6 +178,20 @@ func (s *Server) AddN(from string, key []byte, value []byte) error {
 	return nil
 }
 
+// Delete deletes key
+func (s *Server) Delete(from string, key []byte) error {
+	const op = "server.Delete"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	peer, ok := s.peers[from]
+	if !ok {
+		return ErrUknownPeer
+	}
+	s.kv.Delete(key)
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("key is deleted")
+	return nil
+}
+
 // handleRawMessage handles ram message and execute logic for given type of message
 func (s *Server) handleRawMessage(from string, msg []byte) error {
 	const op = "server.handleRawMessage"
@@ -199,8 +213,9 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return s.Add(from, v.Key)
 	case command.AdddNCommand:
 		return s.AddN(from, v.Key, v.Val)
+	case command.DeleteCommnad:
+		return s.Delete(from, v.Key)
 	}
-
 	return nil
 }
 
