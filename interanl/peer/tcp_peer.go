@@ -1,23 +1,27 @@
 package Mypeer
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
 type TCPPeer struct {
-	Conn  net.Conn
-	msgCh chan Message
+	Conn   net.Conn
+	msgCh  chan Message
+	dropCh chan string
 }
 type Message struct {
 	From    string
 	Payload []byte
 }
 
-func NewTCPPeer(conn net.Conn, msgch chan Message) *TCPPeer {
+func NewTCPPeer(conn net.Conn, msgch chan Message, dropCh chan string) *TCPPeer {
 	return &TCPPeer{
-		Conn:  conn,
-		msgCh: msgch,
+		Conn:   conn,
+		msgCh:  msgch,
+		dropCh: dropCh,
 	}
 }
 
@@ -31,6 +35,10 @@ func (t *TCPPeer) ReadLoop() error {
 	for {
 		n, err := t.Conn.Read(buf)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				t.dropCh <- t.Addr()
+				return fmt.Errorf("%s:%w", op, err)
+			}
 			return fmt.Errorf("%s:%w", op, err)
 		}
 		msgBuf := make([]byte, n)

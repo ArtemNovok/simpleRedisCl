@@ -109,6 +109,10 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	close(startChan)
 	wg2.Wait()
+	time.Sleep(30 * time.Millisecond)
+	cl.Close()
+	time.Sleep(30 * time.Millisecond)
+	require.Equal(t, len(s.peers), 1)
 	s.ShowData()
 }
 func Test_TwoClientWritesAndReadOneValue(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 var (
 	CommandSet                 = "SET"
 	CommandGet                 = "GET"
+	CommnadHello               = "HELLO"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 )
@@ -24,6 +25,9 @@ type SetCommand struct {
 }
 type GetCommand struct {
 	Key []byte
+}
+type HelloCommand struct {
+	value string
 }
 
 func ParseCommand(rawMsg string) (Command, error) {
@@ -54,6 +58,11 @@ func ParseCommand(rawMsg string) (Command, error) {
 				return GetCommand{
 					Key: v.Array()[1].Bytes(),
 				}, nil
+			case CommnadHello:
+				return HelloCommand{
+					value: v.Array()[1].String(),
+				}, nil
+
 			default:
 				return nil, ErrUnknownCommand
 			}

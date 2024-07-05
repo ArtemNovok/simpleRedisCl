@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -106,7 +107,21 @@ func (c *Client) Get(ctx context.Context, key string) (string, error) {
 		return resp.value, resp.err
 	}
 }
-
+func (c *Client) Hello(ctx context.Context, m map[string]string) error {
+	mapString := writeMapResp(m)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue("HELLO"),
+		resp.StringValue(mapString)})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (c *Client) readResult() (string, error) {
 	var res bool
 	err := binary.Read(c.conn, binary.BigEndian, &res)
@@ -129,4 +144,15 @@ func (c *Client) readResult() (string, error) {
 
 func (c *Client) Close() error {
 	return c.conn.Close()
+}
+
+func writeMapResp(m map[string]string) string {
+	buf := bytes.Buffer{}
+	buf.WriteString("%" + fmt.Sprintf("%v\r\n", len(m)))
+	for key, val := range m {
+		buf.WriteString(fmt.Sprintf("+%s\r\n", key))
+		buf.WriteString(fmt.Sprintf(":%s\r\n", val))
+	}
+	return buf.String()
+
 }

@@ -28,6 +28,7 @@ type Server struct {
 	Config
 	peers     map[string]*Mypeer.TCPPeer
 	addPeerCh chan *Mypeer.TCPPeer
+	dropPeer  chan string
 	quitCh    chan struct{}
 	msgCh     chan Mypeer.Message
 	listener  net.Listener
@@ -42,6 +43,7 @@ func NewServer(cfg Config) *Server {
 		Config:    cfg,
 		peers:     make(map[string]*Mypeer.TCPPeer),
 		addPeerCh: make(chan *Mypeer.TCPPeer),
+		dropPeer:  make(chan string),
 		quitCh:    make(chan struct{}),
 		msgCh:     make(chan Mypeer.Message),
 		kv:        storage.NreKeyValue(),
@@ -82,6 +84,8 @@ func (s *Server) loop() {
 		case peer := <-s.addPeerCh:
 			log.Info("added new peer", slog.String("peer address", peer.Addr()))
 			s.peers[peer.Addr()] = peer
+		case from := <-s.dropPeer:
+			delete(s.peers, from)
 		case <-s.quitCh:
 			log.Info("server stopped due to Stop func call")
 			return
@@ -145,6 +149,9 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return s.Set(from, v.Key, v.Val)
 	case command.GetCommand:
 		return s.Get(from, v.Key)
+	case command.HelloCommand:
+		log.Info("got hello command")
+		return nil
 	}
 
 	return nil
@@ -167,7 +174,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 	const op = "server.handleConn"
 	log := s.Log.With("op", op)
 	log.Info("starting handling connection", slog.String("address", conn.RemoteAddr().String()))
-	peer := Mypeer.NewTCPPeer(conn, s.msgCh)
+	peer := Mypeer.NewTCPPeer(conn, s.msgCh, s.dropPeer)
 	s.addPeerCh <- peer
 	if err := peer.ReadLoop(); err != nil {
 		if errors.Is(err, io.EOF) {
