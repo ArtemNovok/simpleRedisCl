@@ -14,6 +14,11 @@ import (
 )
 
 var (
+	CommandSet         = "SET"
+	CommandGet         = "GET"
+	CommnadHello       = "HELLO"
+	CommandAdd         = "ADD"
+	CommandAddN        = "ADDN"
 	ErrOperationFailed = errors.New("operation failed")
 	ErrTimeIsOut       = errors.New("time is out")
 )
@@ -44,7 +49,7 @@ func (c *Client) Set(ctx context.Context, key string, value string) error {
 	defer c.connLock.Unlock()
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue("SET"),
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandSet),
 		resp.StringValue(key),
 		resp.StringValue(value),
 	})
@@ -61,11 +66,14 @@ func (c *Client) Set(ctx context.Context, key string, value string) error {
 		err = binary.Read(c.conn, binary.BigEndian, &res)
 		if err != nil {
 			ch <- err
+			return
 		}
 		if !res {
 			ch <- ErrOperationFailed
+			return
 		}
 		ch <- nil
+		return
 
 	}()
 	select {
@@ -83,7 +91,7 @@ func (c *Client) Get(ctx context.Context, key string) (string, error) {
 	defer c.connLock.Unlock()
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue("GET"),
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandGet),
 		resp.StringValue(key)})
 	if err != nil {
 		return "", err
@@ -107,6 +115,88 @@ func (c *Client) Get(ctx context.Context, key string) (string, error) {
 		return resp.value, resp.err
 	}
 }
+
+func (c *Client) Add(ctx context.Context, key string) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandAdd),
+		resp.StringValue(key),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err := binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
+}
+
+func (c *Client) AddN(ctx context.Context, key string, value string) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandAddN),
+		resp.StringValue(key),
+		resp.StringValue(value),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err := binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
+}
+
 func (c *Client) Hello(ctx context.Context, m map[string]string) error {
 	mapString := writeMapResp(m)
 	buf := &bytes.Buffer{}

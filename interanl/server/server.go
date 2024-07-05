@@ -119,6 +119,7 @@ func (s *Server) Get(from string, key []byte) error {
 		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
 	}
 	val, ok := s.kv.Get(key)
+	log.Info("got value for a peer", slog.String("value", string(val)))
 	n := int64(len(val))
 	if !ok {
 		binary.Write(peer.Conn, binary.BigEndian, false)
@@ -132,6 +133,37 @@ func (s *Server) Get(from string, key []byte) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	log.Info("key value is find and sended to peer")
+	return nil
+}
+func (s *Server) Add(from string, key []byte) error {
+	const op = "server.Add"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	peer, ok := s.peers[from]
+	if !ok {
+		return ErrUknownPeer
+	}
+	if err := s.kv.Add(key); err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("key value is increment by one")
+	return nil
+}
+
+func (s *Server) AddN(from string, key []byte, value []byte) error {
+	const op = "server.Add"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	peer, ok := s.peers[from]
+	if !ok {
+		return ErrUknownPeer
+	}
+	if err := s.kv.AddN(key, value); err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("key value is increment by", slog.String("value", string(value)))
 	return nil
 }
 
@@ -151,7 +183,10 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return s.Get(from, v.Key)
 	case command.HelloCommand:
 		log.Info("got hello command")
-		return nil
+	case command.AddCommand:
+		return s.Add(from, v.Key)
+	case command.AdddNCommand:
+		return s.AddN(from, v.Key, v.Val)
 	}
 
 	return nil

@@ -12,6 +12,8 @@ var (
 	CommandSet                 = "SET"
 	CommandGet                 = "GET"
 	CommnadHello               = "HELLO"
+	CommandAdd                 = "ADD"
+	CommandAddN                = "ADDN"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 )
@@ -25,6 +27,13 @@ type SetCommand struct {
 }
 type GetCommand struct {
 	Key []byte
+}
+type AddCommand struct {
+	Key []byte
+}
+type AdddNCommand struct {
+	Key []byte
+	Val []byte
 }
 type HelloCommand struct {
 	value string
@@ -43,7 +52,7 @@ func ParseCommand(rawMsg string) (Command, error) {
 		if v.Type() == resp.Array {
 			switch v.Array()[0].String() {
 			case CommandSet:
-				if len(v.Array()) > 3 {
+				if len(v.Array()) != 3 {
 					return nil, ErrUnknownCommandArguments
 				}
 				return SetCommand{
@@ -52,11 +61,26 @@ func ParseCommand(rawMsg string) (Command, error) {
 				}, nil
 
 			case CommandGet:
-				if len(v.Array()) > 2 {
+				if len(v.Array()) != 2 {
 					return nil, ErrUnknownCommandArguments
 				}
 				return GetCommand{
 					Key: v.Array()[1].Bytes(),
+				}, nil
+			case CommandAdd:
+				if len(v.Array()) != 2 {
+					return nil, ErrUnknownCommandArguments
+				}
+				return AddCommand{
+					Key: v.Array()[1].Bytes(),
+				}, nil
+			case CommandAddN:
+				if len(v.Array()) != 3 {
+					return nil, ErrUnknownCommandArguments
+				}
+				return AdddNCommand{
+					Key: v.Array()[1].Bytes(),
+					Val: v.Array()[2].Bytes(),
 				}, nil
 			case CommnadHello:
 				return HelloCommand{
