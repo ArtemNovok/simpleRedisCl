@@ -24,6 +24,7 @@ type Config struct {
 	Log        *slog.Logger
 }
 
+// Server represents goRedisClone server
 type Server struct {
 	Config
 	peers     map[string]*Mypeer.TCPPeer
@@ -35,6 +36,7 @@ type Server struct {
 	kv        *storage.KeyValue
 }
 
+// NewServer returns server instance with given server Config
 func NewServer(cfg Config) *Server {
 	if len(cfg.ListenAddr) == 0 {
 		cfg.ListenAddr = DefaultAddress
@@ -50,6 +52,7 @@ func NewServer(cfg Config) *Server {
 	}
 }
 
+// ShowData shows data if log level is Debug
 func (s *Server) ShowData() {
 	for key, val := range s.kv.Data {
 		s.Log.Debug("info", slog.String("key", key), slog.String("value", string(val)))
@@ -58,6 +61,8 @@ func (s *Server) ShowData() {
 func (s *Server) Stop() {
 	close(s.quitCh)
 }
+
+// Start starts server
 func (s *Server) Start() error {
 	const op = "server.Start"
 	log := s.Log.With("op", op)
@@ -92,6 +97,8 @@ func (s *Server) loop() {
 		}
 	}
 }
+
+// Set sets the key value and write response to the client with info about operation result
 func (s *Server) Set(from string, key, val []byte) error {
 	const op = "server.Set"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -111,6 +118,7 @@ func (s *Server) Set(from string, key, val []byte) error {
 	return nil
 }
 
+// Get gets value of the key and response to the client
 func (s *Server) Get(from string, key []byte) error {
 	const op = "server.Get"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -135,6 +143,8 @@ func (s *Server) Get(from string, key []byte) error {
 	log.Info("key value is find and sended to peer")
 	return nil
 }
+
+// Add increments key value by 1 and writes response about success of the operation
 func (s *Server) Add(from string, key []byte) error {
 	const op = "server.Add"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -151,6 +161,7 @@ func (s *Server) Add(from string, key []byte) error {
 	return nil
 }
 
+// AddN increments key value by given value and writes response about success of the operation
 func (s *Server) AddN(from string, key []byte, value []byte) error {
 	const op = "server.Add"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -167,6 +178,7 @@ func (s *Server) AddN(from string, key []byte, value []byte) error {
 	return nil
 }
 
+// handleRawMessage handles ram message and execute logic for given type of message
 func (s *Server) handleRawMessage(from string, msg []byte) error {
 	const op = "server.handleRawMessage"
 	log := s.Log.With("op", op)

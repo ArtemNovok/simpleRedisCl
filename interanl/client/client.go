@@ -14,15 +14,18 @@ import (
 )
 
 var (
-	CommandSet         = "SET"
-	CommandGet         = "GET"
-	CommnadHello       = "HELLO"
-	CommandAdd         = "ADD"
-	CommandAddN        = "ADDN"
+	CommandSet   = "SET"
+	CommandGet   = "GET"
+	CommnadHello = "HELLO"
+	CommandAdd   = "ADD"
+	CommandAddN  = "ADDN"
+	// ErrOperationFailed returned when operation failed not due to context cancel
 	ErrOperationFailed = errors.New("operation failed")
-	ErrTimeIsOut       = errors.New("time is out")
+	// ErrTimeIsOut returned whe operation failed due to context cancel
+	ErrTimeIsOut = errors.New("time is out")
 )
 
+// Client used for communication between app and server, it supports concurrent operations
 type Client struct {
 	addr     string
 	connLock sync.Mutex
@@ -33,6 +36,7 @@ type GetResult struct {
 	err   error
 }
 
+// New create connection  to the server and returns client with that connection and  error if occurs
 func New(addr string) (*Client, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -44,6 +48,7 @@ func New(addr string) (*Client, error) {
 	}, nil
 }
 
+// Set sets key with given value it returns error if ctx is done or operation failed
 func (c *Client) Set(ctx context.Context, key string, value string) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -86,6 +91,9 @@ func (c *Client) Set(ctx context.Context, key string, value string) error {
 		return nil
 	}
 }
+
+// Get reruns key value and  error if ctx is done or operation failed
+
 func (c *Client) Get(ctx context.Context, key string) (string, error) {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -116,6 +124,7 @@ func (c *Client) Get(ctx context.Context, key string) (string, error) {
 	}
 }
 
+// Add increment key value by 1 and  returns error if ctx is done or operation failed
 func (c *Client) Add(ctx context.Context, key string) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -156,6 +165,7 @@ func (c *Client) Add(ctx context.Context, key string) error {
 	}
 }
 
+// AddN increment key value by given value and  returns error if ctx is done or operation failed
 func (c *Client) AddN(ctx context.Context, key string, value string) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
