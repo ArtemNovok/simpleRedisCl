@@ -1,6 +1,8 @@
 package storage
 
-import "sync"
+import (
+	"sync"
+)
 
 type List struct {
 	mu    sync.Mutex
@@ -42,4 +44,28 @@ func (l *List) GetL(key []byte) ([][]byte, error) {
 		return nil, ErrKeyDoNotExists
 	}
 	return mapList, nil
+}
+func (l *List) DeleteL(key []byte) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.lists, string(key))
+	return nil
+}
+
+func (l *List) DelElmL(key []byte, value []byte) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	mapList, ok := l.lists[string(key)]
+	if !ok {
+		return ErrKeyDoNotExists
+	}
+	var newList [][]byte
+	for ind, val := range mapList {
+		if string(val) == string(value) {
+			newList = append(mapList[:ind], mapList[ind+1:]...)
+			break
+		}
+	}
+	l.lists[string(key)] = newList
+	return nil
 }

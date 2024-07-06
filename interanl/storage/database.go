@@ -102,3 +102,19 @@ func (s *Storage) GetL(key []byte, index int) ([][]byte, error) {
 	}
 	return s.DBS[index].LST.GetL(key)
 }
+
+func (s *Storage) DeleteL(key []byte, index int) error {
+	const op = "storage.DeleteL"
+	if index > 39 || index < 0 {
+		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
+	}
+	return s.DBS[index].LST.DeleteL(key)
+}
+
+func (s *Storage) DelElemL(key []byte, value []byte, index int) error {
+	const op = "storage.DelElemL"
+	if index > 39 || index < 0 {
+		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
+	}
+	return s.DBS[index].LST.DelElmL(key, value)
+}

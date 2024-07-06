@@ -34,6 +34,20 @@ func Test_Client2(t *testing.T) {
 	res, err := cl.GetL(ctx, key, ind)
 	require.Nil(t, err)
 	require.Equal(t, res, want)
+	err = cl.DelElemL(ctx, key, value, ind)
+	require.Nil(t, err)
+	want = want[1:]
+	res, err = cl.GetL(ctx, key, ind)
+	require.Nil(t, err)
+	require.Equal(t, res, want)
+	err = cl.DeleteL(ctx, key, ind)
+	require.Nil(t, err)
+	_, err = cl.GetL(ctx, key, ind)
+	require.NotNil(t, err)
+	isExist, err := cl.Has(ctx, key, ind)
+	require.Nil(t, err)
+	require.Equal(t, isExist, false)
+
 }
 func Test_Client(t *testing.T) {
 	cl, err := New(ctx, "localhost:6666", "")

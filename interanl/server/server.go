@@ -282,6 +282,42 @@ func (s *Server) Delete(from string, key []byte, index int) error {
 	log.Info("key is deleted")
 	return nil
 }
+func (s *Server) DeleteL(from string, key []byte, index int) error {
+	const op = "server.DeleteL"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
+	peer, ok := s.peers[from]
+	s.mu.RUnlock()
+	if !ok {
+		return ErrUknownPeer
+	}
+	err := s.Storage.DeleteL(key, index)
+	if err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("list is deleted")
+	return nil
+}
+func (s *Server) DelElemL(from string, key []byte, value []byte, index int) error {
+	const op = "storage.DelElemL"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
+	peer, ok := s.peers[from]
+	s.mu.RUnlock()
+	if !ok {
+		return ErrUknownPeer
+	}
+	err := s.Storage.DelElemL(key, value, index)
+	if err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("list value is deleted")
+	return nil
+}
 
 // handleRawMessage handles ram message and execute logic for given type of message
 func (s *Server) handleRawMessage(from string, msg []byte) error {
@@ -294,6 +330,10 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	switch v := cmd.(type) {
+	case command.DelElemLCommnad:
+		return s.DelElemL(from, v.Key, v.Val, v.Index)
+	case command.DeleteLCommnad:
+		return s.DeleteL(from, v.Key, v.Index)
 	case command.LPushCommand:
 		return s.LPush(from, v.Key, v.Val, v.Index)
 	case command.GetLCommand:

@@ -19,15 +19,17 @@ const (
 )
 
 var (
-	CommandDelete = "DEL"
-	CommandSet    = "SET"
-	CommandGet    = "GET"
-	CommnadHello  = "HELLO"
-	CommandAdd    = "ADD"
-	CommandAddN   = "ADDN"
-	CommandLPush  = "LPUSH"
-	CommandGetL   = "GETL"
-	CommandHas    = "HAS"
+	CommandDelete  = "DEL"
+	CommandSet     = "SET"
+	CommandGet     = "GET"
+	CommnadHello   = "HELLO"
+	CommandAdd     = "ADD"
+	CommandAddN    = "ADDN"
+	CommandLPush   = "LPUSH"
+	CommandGetL    = "GETL"
+	CommandHas     = "HAS"
+	CommandDeleteL = "DELL"
+	CommnaDelElemL = "DELELEML"
 	// ErrOperationFailed returned when operation failed not due to context cancel
 	ErrOperationFailed = errors.New("operation failed")
 	// ErrTimeIsOut returned when operation failed due to context cancel
@@ -88,6 +90,99 @@ func New(ctx context.Context, addr string, password string) (*Client, error) {
 		}, nil
 	}
 }
+
+func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommnaDelElemL),
+		resp.StringValue(key),
+		resp.StringValue(value),
+		resp.StringValue(index),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
+
+}
+
+func (c *Client) DeleteL(ctx context.Context, key string, ind int) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDeleteL),
+		resp.StringValue(key),
+		resp.StringValue(index),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
+}
+
 func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -202,28 +297,21 @@ func (c *Client) Has(ctx context.Context, key string, ind int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	ch := make(chan error)
+	ch := make(chan bool)
 	go func() {
 		var res bool
 		err = binary.Read(c.conn, binary.BigEndian, &res)
 		if err != nil {
-			ch <- err
+			ch <- false
 			return
 		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
+		ch <- res
 	}()
 	select {
 	case <-ctx.Done():
 		return false, ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return false, ErrOperationFailed
-		}
-		return true, nil
+	case res := <-ch:
+		return res, nil
 	}
 
 }

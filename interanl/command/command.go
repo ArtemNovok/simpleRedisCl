@@ -19,6 +19,8 @@ var (
 	CommandLPush               = "LPUSH"
 	CommandGetL                = "GETL"
 	CommandHas                 = "HAS"
+	CommandDeleteL             = "DELL"
+	CommnaDelElemL             = "DELELEML"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 	ErrInvalidIndexValue       = errors.New("invalid index value")
@@ -26,6 +28,15 @@ var (
 
 type Command interface {
 	// TODO
+}
+
+type DeleteLCommnad struct {
+	Key   []byte
+	Index int
+}
+type DelElemLCommnad struct {
+	Key, Val []byte
+	Index    int
 }
 type LPushCommand struct {
 	Key, Val []byte
@@ -77,6 +88,31 @@ func ParseCommand(rawMsg string) (Command, error) {
 		}
 		if v.Type() == resp.Array {
 			switch v.Array()[0].String() {
+			case CommandDeleteL:
+				if len(v.Array()) != 3 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[2].String())
+				if err != nil {
+					return nil, err
+				}
+				return DeleteLCommnad{
+					Key:   v.Array()[1].Bytes(),
+					Index: ind,
+				}, nil
+			case CommnaDelElemL:
+				if len(v.Array()) != 4 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[3].String())
+				if err != nil {
+					return nil, err
+				}
+				return DelElemLCommnad{
+					Key:   v.Array()[1].Bytes(),
+					Val:   v.Array()[2].Bytes(),
+					Index: ind,
+				}, nil
 			case CommandLPush:
 				if len(v.Array()) != 4 {
 					return nil, ErrUnknownCommandArguments
