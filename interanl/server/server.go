@@ -14,13 +14,19 @@ import (
 	"github.com/ArtemNovok/simpleRedisCl/interanl/storage"
 )
 
+const (
+	defaultPassword = "secret"
+)
+
 var (
-	DefaultAddress = ":6666"
-	ErrUknownPeer  = errors.New("unknown peer")
+	DefaultAddress     = ":6666"
+	ErrUknownPeer      = errors.New("unknown peer")
+	ErrInvalidPassword = errors.New("invalid password")
 )
 
 type Config struct {
 	ListenAddr string
+	password   string
 	Log        *slog.Logger
 }
 
@@ -40,6 +46,9 @@ type Server struct {
 func NewServer(cfg Config) *Server {
 	if len(cfg.ListenAddr) == 0 {
 		cfg.ListenAddr = DefaultAddress
+	}
+	if len(cfg.password) == 0 {
+		cfg.password = defaultPassword
 	}
 	return &Server{
 		Config:    cfg,
@@ -240,7 +249,20 @@ func (s *Server) listenLoop() error {
 
 func (s *Server) handleConn(conn net.Conn) error {
 	const op = "server.handleConn"
-	log := s.Log.With("op", op)
+	log := s.Log.With(slog.String("op", op), slog.String("connection address", conn.RemoteAddr().String()))
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		log.Error("failed to read password from peer")
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	strPass := string(buf[:n])
+	if s.password != strPass {
+		log.Error("peer with wrong password", slog.String("password", strPass))
+		binary.Write(conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, ErrInvalidPassword)
+	}
+	binary.Write(conn, binary.BigEndian, true)
 	log.Info("starting handling connection", slog.String("address", conn.RemoteAddr().String()))
 	peer := Mypeer.NewTCPPeer(conn, s.msgCh, s.dropPeer)
 	s.addPeerCh <- peer

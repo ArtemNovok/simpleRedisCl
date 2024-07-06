@@ -14,6 +14,10 @@ import (
 	"github.com/tidwall/resp"
 )
 
+const (
+	defaultPassword = "secret"
+)
+
 var (
 	CommandDelete = "DEL"
 	CommandSet    = "SET"
@@ -27,6 +31,8 @@ var (
 	ErrTimeIsOut = errors.New("time is out")
 	// ErrInvalidIndex returned when operation index value  beyond  0 <= ind <= 39
 	ErrInvalidIndex = errors.New("invalid index value")
+	// ErrInvalidPassword returned when wrong password is used to connect to a server
+	ErrInvalidPassword = errors.New("invalid password")
 )
 
 // Client used for communication between app and server, it supports concurrent operations
@@ -34,6 +40,7 @@ type Client struct {
 	addr     string
 	connLock sync.Mutex
 	conn     net.Conn
+	password string
 }
 type GetResult struct {
 	value string
@@ -41,15 +48,42 @@ type GetResult struct {
 }
 
 // New create connection  to the server and returns client with that connection and  error if occurs
-func New(addr string) (*Client, error) {
+func New(ctx context.Context, addr string, password string) (*Client, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{
-		addr: addr,
-		conn: conn,
-	}, nil
+	if len(password) == 0 {
+		password = defaultPassword
+	}
+	_, err = conn.Write([]byte(password))
+	if err != nil {
+		return nil, err
+	}
+	ch := make(chan bool)
+	go func() {
+		var res bool
+		err = binary.Read(conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- false
+
+		} else {
+			ch <- res
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ErrTimeIsOut
+	case res := <-ch:
+		if !res {
+			return nil, ErrInvalidPassword
+		}
+		return &Client{
+			addr:     addr,
+			conn:     conn,
+			password: password,
+		}, nil
+	}
 }
 func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 	c.connLock.Lock()

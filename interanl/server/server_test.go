@@ -17,6 +17,8 @@ import (
 )
 
 func Test_ServerAndClients(t *testing.T) {
+	ctx := context.Background()
+	p := ""
 	logger := setUpLogger()
 	addr := ":5555"
 	ind := 0
@@ -25,7 +27,7 @@ func Test_ServerAndClients(t *testing.T) {
 		log.Fatal(s.Start())
 	}()
 	time.Sleep(1 * time.Second)
-	cl, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,6 +66,8 @@ func Test_ServerAndClients(t *testing.T) {
 }
 
 func Test_TwoClientWriteOneValue(t *testing.T) {
+	ctx := context.Background()
+	p := ""
 	wg2 := sync.WaitGroup{}
 	logger := setUpLogger()
 	addr := ":8888"
@@ -73,11 +77,11 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 		log.Fatal(s.Start())
 	}()
 	time.Sleep(1 * time.Second)
-	cl, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cl2, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl2, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,6 +122,8 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 	s.ShowData()
 }
 func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
+	ctx := context.Background()
+	p := ""
 	wg := sync.WaitGroup{}
 	logger := setUpLogger()
 	addr := ":3333"
@@ -127,11 +133,11 @@ func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
 		log.Fatal(s.Start())
 	}()
 	time.Sleep(1 * time.Second)
-	cl, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cl2, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl2, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -173,6 +179,8 @@ func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
 }
 
 func Test_FiveClient(t *testing.T) {
+	ctx := context.Background()
+	p := ""
 	wg := sync.WaitGroup{}
 	logger := setUpLogger()
 	addr := ":4444"
@@ -182,23 +190,23 @@ func Test_FiveClient(t *testing.T) {
 		log.Fatal(s.Start())
 	}()
 	time.Sleep(1 * time.Second)
-	cl, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cl2, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl2, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cl3, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl3, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cl4, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl4, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cl5, err := client.New(fmt.Sprintf("localhost%s", addr))
+	cl5, err := client.New(ctx, fmt.Sprintf("localhost%s", addr), p)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -303,7 +311,21 @@ func Test_FiveClient(t *testing.T) {
 	time.Sleep(6 * time.Millisecond)
 	s.ShowData()
 }
-
+func Test_PasswordSupport(t *testing.T) {
+	logger := setUpLogger()
+	addr := "localhost:1234"
+	s := SetUpServerWithPassword(logger, ":1234", "mypassword")
+	go func() {
+		log.Fatal(s.Start())
+	}()
+	_, err := client.New(context.Background(), addr, "mypassword")
+	require.Nil(t, err)
+	_, err = client.New(context.Background(), addr, "")
+	require.ErrorIs(t, err, client.ErrInvalidPassword)
+	ctx, _ := context.WithTimeout(context.Background(), 1*time.Microsecond)
+	_, err = client.New(ctx, addr, "mypassword")
+	require.ErrorIs(t, err, client.ErrTimeIsOut)
+}
 func setUpLogger() *slog.Logger {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	return log
@@ -313,6 +335,14 @@ func SetUpServer(logger *slog.Logger, addr string) *Server {
 	cfg := Config{
 		Log:        logger,
 		ListenAddr: addr,
+	}
+	return NewServer(cfg)
+}
+func SetUpServerWithPassword(logger *slog.Logger, addr string, password string) *Server {
+	cfg := Config{
+		Log:        logger,
+		ListenAddr: addr,
+		password:   password,
 	}
 	return NewServer(cfg)
 }

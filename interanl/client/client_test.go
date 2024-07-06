@@ -14,10 +14,16 @@ import (
 
 // if you wanna run this tests, you need running instance of the server
 // on right address (localhost:6666), or change address manually in every test
+var ctx context.Context = context.Background()
 
 func Test_Client(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
+	_, err = New(ctx, "localhost:6666", "wrongPassword")
+	require.ErrorIs(t, err, ErrInvalidPassword)
+	ctx2, _ := context.WithTimeout(ctx, 1*time.Microsecond)
+	_, err = New(ctx2, "localhost:6666", "wrongPassword")
+	require.ErrorIs(t, err, ErrTimeIsOut)
 	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 	err = cl.Set(ctx, "foo", "bar", 0)
 	require.Nil(t, err)
@@ -32,14 +38,14 @@ func Test_WriteMapResp(t *testing.T) {
 		"foo":  "bar",
 		"foo2": "bar2",
 	}
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
 	err = cl.Hello(context.Background(), m)
 	require.Nil(t, err)
 }
 
 func Test_ADD(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	key := "one"
 	require.Nil(t, err)
 	ctx, _ := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -60,7 +66,7 @@ func Test_ADD(t *testing.T) {
 }
 
 func Test_BADVALUE(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
 	key := "one"
 	err = cl.Set(context.Background(), key, "badValue", 0)
@@ -72,7 +78,7 @@ func Test_BADVALUE(t *testing.T) {
 }
 
 func Test_AddN(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	key := "one"
 	value := "2"
 	require.Nil(t, err)
@@ -89,9 +95,9 @@ func Test_AddN(t *testing.T) {
 	require.Equal(t, val, "3")
 }
 func Test_ADD_ADDN(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
-	cl2, err := New("localhost:6666")
+	cl2, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
 	key := "one"
 	cl.Set(context.Background(), key, "1", 0)
@@ -128,7 +134,7 @@ func Test_ADD_ADDN(t *testing.T) {
 	fmt.Println(val)
 }
 func Test_Delete(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
 	key := "one"
 	ctx, _ := context.WithTimeout(context.Background(), 500*time.Microsecond)
@@ -140,9 +146,9 @@ func Test_Delete(t *testing.T) {
 	require.NotNil(t, err)
 }
 func Test_DataBaseSupport(t *testing.T) {
-	cl, err := New("localhost:6666")
+	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
-	cl2, err := New("localhost:6666")
+	cl2, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
 	key1 := "one"
 	val1 := "value_one"
@@ -165,7 +171,7 @@ func Test_DataBaseSupport2(t *testing.T) {
 	wg := sync.WaitGroup{}
 	start := time.Now()
 	for i := 0; i < 400; i++ {
-		cl, err := New(address)
+		cl, err := New(ctx, address, "")
 		require.Nil(t, err)
 		wg.Add(1)
 		go func() {
@@ -184,7 +190,7 @@ func Test_DataBaseSupport2(t *testing.T) {
 	}
 	wg.Wait()
 	for i := 0; i < 400; i++ {
-		cl, err := New(address)
+		cl, err := New(ctx, address, "")
 		require.Nil(t, err)
 		wg.Add(1)
 		go func() {
