@@ -25,6 +25,9 @@ var (
 	CommnadHello  = "HELLO"
 	CommandAdd    = "ADD"
 	CommandAddN   = "ADDN"
+	CommandLPush  = "LPUSH"
+	CommandGetL   = "GETL"
+	CommandHas    = "HAS"
 	// ErrOperationFailed returned when operation failed not due to context cancel
 	ErrOperationFailed = errors.New("operation failed")
 	// ErrTimeIsOut returned when operation failed due to context cancel
@@ -121,6 +124,154 @@ func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 		return nil
 	}
 }
+func (c *Client) GetL(ctx context.Context, key string, ind int) ([]string, error) {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return nil, ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandGetL),
+		resp.StringValue(key),
+		resp.StringValue(index),
+	})
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return nil, err
+	}
+	ch := make(chan []string)
+	go func() {
+		var res bool
+		binary.Read(c.conn, binary.BigEndian, &res)
+		if !res {
+			ch <- nil
+			return
+		}
+		var lenSL int64
+		binary.Read(c.conn, binary.BigEndian, &lenSL)
+		slice := make([]string, 0, lenSL)
+		for i := 0; i < int(lenSL); i++ {
+			var size int64
+			err := binary.Read(c.conn, binary.BigEndian, &size)
+			if err != nil {
+				ch <- nil
+				return
+			}
+			buf := make([]byte, size)
+			if _, err := c.conn.Read(buf); err != nil {
+				ch <- nil
+				return
+			}
+			slice = append(slice, string(buf))
+		}
+		ch <- slice
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ErrTimeIsOut
+	case res := <-ch:
+		if res == nil {
+			return nil, ErrOperationFailed
+		}
+		return res, nil
+	}
+}
+func (c *Client) Has(ctx context.Context, key string, ind int) (bool, error) {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return false, ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandHas),
+		resp.StringValue(key),
+		resp.StringValue(index),
+	})
+	if err != nil {
+		return false, err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return false, err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return false, ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return false, ErrOperationFailed
+		}
+		return true, nil
+	}
+
+}
+func (c *Client) LPush(ctx context.Context, key string, value string, ind int) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandLPush),
+		resp.StringValue(key),
+		resp.StringValue(value),
+		resp.StringValue(index),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
+}
 
 // Set sets key with given value it returns error if ctx is done or operation failed
 func (c *Client) Set(ctx context.Context, key string, value string, ind int) error {
@@ -157,8 +308,6 @@ func (c *Client) Set(ctx context.Context, key string, value string, ind int) err
 			return
 		}
 		ch <- nil
-		return
-
 	}()
 	select {
 	case <-ctx.Done():

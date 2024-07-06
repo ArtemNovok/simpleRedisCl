@@ -16,6 +16,9 @@ var (
 	CommandAdd                 = "ADD"
 	CommandAddN                = "ADDN"
 	CommandDelete              = "DEL"
+	CommandLPush               = "LPUSH"
+	CommandGetL                = "GETL"
+	CommandHas                 = "HAS"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 	ErrInvalidIndexValue       = errors.New("invalid index value")
@@ -24,10 +27,21 @@ var (
 type Command interface {
 	// TODO
 }
-
+type LPushCommand struct {
+	Key, Val []byte
+	Index    int
+}
 type SetCommand struct {
 	Key, Val []byte
 	Index    int
+}
+type GetLCommand struct {
+	Key   []byte
+	Index int
+}
+type HasCommand struct {
+	Key   []byte
+	Index int
 }
 type GetCommand struct {
 	Key   []byte
@@ -63,6 +77,43 @@ func ParseCommand(rawMsg string) (Command, error) {
 		}
 		if v.Type() == resp.Array {
 			switch v.Array()[0].String() {
+			case CommandLPush:
+				if len(v.Array()) != 4 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[3].String())
+				if err != nil {
+					return nil, err
+				}
+				return LPushCommand{
+					Key:   v.Array()[1].Bytes(),
+					Val:   v.Array()[2].Bytes(),
+					Index: ind,
+				}, nil
+			case CommandHas:
+				if len(v.Array()) != 3 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[2].String())
+				if err != nil {
+					return nil, err
+				}
+				return HasCommand{
+					Key:   v.Array()[1].Bytes(),
+					Index: ind,
+				}, nil
+			case CommandGetL:
+				if len(v.Array()) != 3 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[2].String())
+				if err != nil {
+					return nil, err
+				}
+				return GetLCommand{
+					Key:   v.Array()[1].Bytes(),
+					Index: ind,
+				}, nil
 			case CommandSet:
 				if len(v.Array()) != 4 {
 					return nil, ErrUnknownCommandArguments

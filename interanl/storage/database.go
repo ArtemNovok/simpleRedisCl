@@ -12,6 +12,7 @@ var (
 type DataBase struct {
 	Index int
 	KV    *KeyValue
+	LST   *List
 }
 type Storage struct {
 	DBS [40]*DataBase
@@ -23,6 +24,7 @@ func NewStorage() *Storage {
 		db := DataBase{
 			Index: i,
 			KV:    NreKeyValue(),
+			LST:   NewList(),
 		}
 		s.DBS[i] = &db
 	}
@@ -78,4 +80,25 @@ func (s *Storage) Delete(key []byte, index int) error {
 		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
 	}
 	return s.DBS[index].KV.Delete(key)
+}
+
+func (s *Storage) LPush(key []byte, value []byte, index int) error {
+	const op = "storage.LPush"
+	if index > 39 || index < 0 {
+		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
+	}
+	return s.DBS[index].LST.LPush(key, value)
+}
+func (s *Storage) Has(key []byte, index int) bool {
+	if index > 39 || index < 0 {
+		return false
+	}
+	return s.DBS[index].LST.Has(key)
+}
+func (s *Storage) GetL(key []byte, index int) ([][]byte, error) {
+	const op = "storage.GetL"
+	if index > 39 || index < 0 {
+		return nil, fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
+	}
+	return s.DBS[index].LST.GetL(key)
 }

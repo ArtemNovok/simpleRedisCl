@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
 
 	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
 	Mypeer "github.com/ArtemNovok/simpleRedisCl/interanl/peer"
@@ -33,6 +34,7 @@ type Config struct {
 // Server represents goRedisClone server
 type Server struct {
 	Config
+	mu        sync.RWMutex
 	peers     map[string]*Mypeer.TCPPeer
 	addPeerCh chan *Mypeer.TCPPeer
 	dropPeer  chan string
@@ -109,12 +111,78 @@ func (s *Server) loop() {
 	}
 }
 
+func (s *Server) LPush(from string, key, val []byte, index int) error {
+	const op = "server.LPush"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
+	peer, ok := s.peers[from]
+	s.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
+	}
+	err := s.Storage.LPush(key, val, index)
+	if err != nil {
+		log.Error("failed to append value to a list", slog.String("key", string(key)))
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("value is appended to a list")
+	return nil
+}
+
+func (s *Server) Has(from string, key []byte, index int) error {
+	const op = "server.Has"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
+	peer, ok := s.peers[from]
+	s.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, s.Storage.Has(key, index))
+	log.Info("Checked whether db has a key", slog.String("key", string(key)))
+	return nil
+}
+
+func (s *Server) GetL(from string, key []byte, index int) error {
+	const op = "server.GetL"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
+	peer, ok := s.peers[from]
+	s.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
+	}
+	slice, err := s.Storage.GetL(key, index)
+	if err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, storage.ErrKeyDoNotExists)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	slLen := int64(len(slice))
+	binary.Write(peer.Conn, binary.BigEndian, slLen)
+	for _, sl := range slice {
+		n := int64(len(sl))
+		binary.Write(peer.Conn, binary.BigEndian, n)
+		r := bytes.NewReader(sl)
+		_, err := io.Copy(peer.Conn, r)
+		if err != nil {
+			return fmt.Errorf("%s:%w", op, err)
+		}
+	}
+	log.Info("list is sended")
+	return nil
+}
+
 // Set sets the key value and write response to the client with info about operation result
 func (s *Server) Set(from string, key, val []byte, index int) error {
 	const op = "server.Set"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
 	// we need peer to write response to client
 	peer, ok := s.peers[from]
+	s.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
 	}
@@ -133,17 +201,19 @@ func (s *Server) Set(from string, key, val []byte, index int) error {
 func (s *Server) Get(from string, key []byte, index int) error {
 	const op = "server.Get"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
 	peer, ok := s.peers[from]
+	s.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
 	}
 	val, ok := s.Storage.Get(key, index)
 	log.Info("got value for a peer", slog.String("value", string(val)))
-	n := int64(len(val))
 	if !ok {
 		binary.Write(peer.Conn, binary.BigEndian, false)
 		return fmt.Errorf("%s:%w", op, storage.ErrKeyDoNotExists)
 	}
+	n := int64(len(val))
 	binary.Write(peer.Conn, binary.BigEndian, true)
 	binary.Write(peer.Conn, binary.BigEndian, n)
 	r := bytes.NewReader(val)
@@ -159,7 +229,9 @@ func (s *Server) Get(from string, key []byte, index int) error {
 func (s *Server) Add(from string, key []byte, index int) error {
 	const op = "server.Add"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
 	peer, ok := s.peers[from]
+	s.mu.RUnlock()
 	if !ok {
 		return ErrUknownPeer
 	}
@@ -176,7 +248,9 @@ func (s *Server) Add(from string, key []byte, index int) error {
 func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 	const op = "server.Add"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
 	peer, ok := s.peers[from]
+	s.mu.RUnlock()
 	if !ok {
 		return ErrUknownPeer
 	}
@@ -193,7 +267,9 @@ func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 func (s *Server) Delete(from string, key []byte, index int) error {
 	const op = "server.Delete"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
 	peer, ok := s.peers[from]
+	s.mu.RUnlock()
 	if !ok {
 		return ErrUknownPeer
 	}
@@ -218,6 +294,12 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	switch v := cmd.(type) {
+	case command.LPushCommand:
+		return s.LPush(from, v.Key, v.Val, v.Index)
+	case command.GetLCommand:
+		return s.GetL(from, v.Key, v.Index)
+	case command.HasCommand:
+		return s.Has(from, v.Key, v.Index)
 	case command.SetCommand:
 		return s.Set(from, v.Key, v.Val, v.Index)
 	case command.GetCommand:

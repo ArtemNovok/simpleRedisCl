@@ -16,6 +16,25 @@ import (
 // on right address (localhost:6666), or change address manually in every test
 var ctx context.Context = context.Background()
 
+func Test_Client2(t *testing.T) {
+	cl, err := New(ctx, "localhost:6666", "")
+	require.Nil(t, err)
+	key := "one"
+	value := "value_one"
+	ind := 0
+	want := []string{}
+	for i := 0; i < 6; i++ {
+		err = cl.LPush(ctx, key, value, ind)
+		require.Nil(t, err)
+		want = append(want, value)
+		isExist, err := cl.Has(ctx, key, ind)
+		require.Nil(t, err)
+		require.Equal(t, isExist, true)
+	}
+	res, err := cl.GetL(ctx, key, ind)
+	require.Nil(t, err)
+	require.Equal(t, res, want)
+}
 func Test_Client(t *testing.T) {
 	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)
