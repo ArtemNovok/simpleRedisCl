@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strconv"
 
 	"github.com/tidwall/resp"
 )
@@ -17,6 +18,7 @@ var (
 	CommandDelete              = "DEL"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
+	ErrInvalidIndexValue       = errors.New("invalid index value")
 )
 
 type Command interface {
@@ -25,22 +27,28 @@ type Command interface {
 
 type SetCommand struct {
 	Key, Val []byte
+	Index    int
 }
 type GetCommand struct {
-	Key []byte
+	Key   []byte
+	Index int
 }
 type AddCommand struct {
-	Key []byte
+	Key   []byte
+	Index int
 }
 type AdddNCommand struct {
-	Key []byte
-	Val []byte
+	Key   []byte
+	Val   []byte
+	Index int
 }
 type HelloCommand struct {
 	value string
+	Index int
 }
 type DeleteCommnad struct {
-	Key []byte
+	Key   []byte
+	Index int
 }
 
 func ParseCommand(rawMsg string) (Command, error) {
@@ -56,42 +64,67 @@ func ParseCommand(rawMsg string) (Command, error) {
 		if v.Type() == resp.Array {
 			switch v.Array()[0].String() {
 			case CommandSet:
-				if len(v.Array()) != 3 {
+				if len(v.Array()) != 4 {
 					return nil, ErrUnknownCommandArguments
 				}
+				ind, err := strconv.Atoi(v.Array()[3].String())
+				if err != nil {
+					return nil, err
+				}
 				return SetCommand{
-					Key: v.Array()[1].Bytes(),
-					Val: v.Array()[2].Bytes(),
+					Key:   v.Array()[1].Bytes(),
+					Val:   v.Array()[2].Bytes(),
+					Index: ind,
 				}, nil
 
 			case CommandGet:
-				if len(v.Array()) != 2 {
-					return nil, ErrUnknownCommandArguments
-				}
-				return GetCommand{
-					Key: v.Array()[1].Bytes(),
-				}, nil
-			case CommandAdd:
-				if len(v.Array()) != 2 {
-					return nil, ErrUnknownCommandArguments
-				}
-				return AddCommand{
-					Key: v.Array()[1].Bytes(),
-				}, nil
-			case CommandAddN:
 				if len(v.Array()) != 3 {
 					return nil, ErrUnknownCommandArguments
 				}
-				return AdddNCommand{
-					Key: v.Array()[1].Bytes(),
-					Val: v.Array()[2].Bytes(),
+				ind, err := strconv.Atoi(v.Array()[2].String())
+				if err != nil {
+					return nil, err
+				}
+				return GetCommand{
+					Key:   v.Array()[1].Bytes(),
+					Index: ind,
 				}, nil
-			case CommandDelete:
-				if len(v.Array()) != 2 {
+			case CommandAdd:
+				if len(v.Array()) != 3 {
 					return nil, ErrUnknownCommandArguments
 				}
+				ind, err := strconv.Atoi(v.Array()[2].String())
+				if err != nil {
+					return nil, err
+				}
+				return AddCommand{
+					Key:   v.Array()[1].Bytes(),
+					Index: ind,
+				}, nil
+			case CommandAddN:
+				if len(v.Array()) != 4 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[3].String())
+				if err != nil {
+					return nil, err
+				}
+				return AdddNCommand{
+					Key:   v.Array()[1].Bytes(),
+					Val:   v.Array()[2].Bytes(),
+					Index: ind,
+				}, nil
+			case CommandDelete:
+				if len(v.Array()) != 3 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[2].String())
+				if err != nil {
+					return nil, err
+				}
 				return DeleteCommnad{
-					Key: v.Array()[1].Bytes(),
+					Key:   v.Array()[1].Bytes(),
+					Index: ind,
 				}, nil
 			case CommnadHello:
 				return HelloCommand{

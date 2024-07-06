@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 
 	"github.com/tidwall/resp"
@@ -22,8 +23,10 @@ var (
 	CommandAddN   = "ADDN"
 	// ErrOperationFailed returned when operation failed not due to context cancel
 	ErrOperationFailed = errors.New("operation failed")
-	// ErrTimeIsOut returned whe operation failed due to context cancel
+	// ErrTimeIsOut returned when operation failed due to context cancel
 	ErrTimeIsOut = errors.New("time is out")
+	// ErrInvalidIndex returned when operation index value  beyond  0 <= ind <= 39
+	ErrInvalidIndex = errors.New("invalid index value")
 )
 
 // Client used for communication between app and server, it supports concurrent operations
@@ -48,13 +51,18 @@ func New(addr string) (*Client, error) {
 		conn: conn,
 	}, nil
 }
-func (c *Client) Delete(ctx context.Context, key string) error {
+func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
 	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelete),
 		resp.StringValue(key),
+		resp.StringValue(index),
 	})
 	if err != nil {
 		return err
@@ -81,14 +89,19 @@ func (c *Client) Delete(ctx context.Context, key string) error {
 }
 
 // Set sets key with given value it returns error if ctx is done or operation failed
-func (c *Client) Set(ctx context.Context, key string, value string) error {
+func (c *Client) Set(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
 	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandSet),
 		resp.StringValue(key),
 		resp.StringValue(value),
+		resp.StringValue(index),
 	})
 	if err != nil {
 		return err
@@ -126,13 +139,19 @@ func (c *Client) Set(ctx context.Context, key string, value string) error {
 
 // Get reruns key value and  error if ctx is done or operation failed
 
-func (c *Client) Get(ctx context.Context, key string) (string, error) {
+func (c *Client) Get(ctx context.Context, key string, ind int) (string, error) {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return "", ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
 	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandGet),
-		resp.StringValue(key)})
+		resp.StringValue(key),
+		resp.StringValue(index),
+	})
 	if err != nil {
 		return "", err
 	}
@@ -157,13 +176,18 @@ func (c *Client) Get(ctx context.Context, key string) (string, error) {
 }
 
 // Add increment key value by 1 and  returns error if ctx is done or operation failed
-func (c *Client) Add(ctx context.Context, key string) error {
+func (c *Client) Add(ctx context.Context, key string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
 	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandAdd),
 		resp.StringValue(key),
+		resp.StringValue(index),
 	})
 	if err != nil {
 		return err
@@ -198,14 +222,19 @@ func (c *Client) Add(ctx context.Context, key string) error {
 }
 
 // AddN increment key value by given value and  returns error if ctx is done or operation failed
-func (c *Client) AddN(ctx context.Context, key string, value string) error {
+func (c *Client) AddN(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
 	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandAddN),
 		resp.StringValue(key),
 		resp.StringValue(value),
+		resp.StringValue(index),
 	})
 	if err != nil {
 		return err

@@ -33,7 +33,7 @@ type Server struct {
 	quitCh    chan struct{}
 	msgCh     chan Mypeer.Message
 	listener  net.Listener
-	kv        *storage.KeyValue
+	Storage   *storage.Storage
 }
 
 // NewServer returns server instance with given server Config
@@ -48,14 +48,16 @@ func NewServer(cfg Config) *Server {
 		dropPeer:  make(chan string),
 		quitCh:    make(chan struct{}),
 		msgCh:     make(chan Mypeer.Message),
-		kv:        storage.NreKeyValue(),
+		Storage:   storage.NewStorage(),
 	}
 }
 
 // ShowData shows data if log level is Debug
 func (s *Server) ShowData() {
-	for key, val := range s.kv.Data {
-		s.Log.Debug("info", slog.String("key", key), slog.String("value", string(val)))
+	for i := 0; i < 40; i++ {
+		for key, val := range s.Storage.DBS[i].KV.Data {
+			s.Log.Debug("info", slog.String("key", key), slog.String("value", string(val)))
+		}
 	}
 }
 func (s *Server) Stop() {
@@ -99,7 +101,7 @@ func (s *Server) loop() {
 }
 
 // Set sets the key value and write response to the client with info about operation result
-func (s *Server) Set(from string, key, val []byte) error {
+func (s *Server) Set(from string, key, val []byte, index int) error {
 	const op = "server.Set"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
 	// we need peer to write response to client
@@ -107,7 +109,7 @@ func (s *Server) Set(from string, key, val []byte) error {
 	if !ok {
 		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
 	}
-	err := s.kv.Set(key, val)
+	err := s.Storage.Set(key, val, index)
 	if err != nil {
 		log.Error("failed to set a key", slog.String("key", string(key)))
 		binary.Write(peer.Conn, binary.BigEndian, false)
@@ -119,14 +121,14 @@ func (s *Server) Set(from string, key, val []byte) error {
 }
 
 // Get gets value of the key and response to the client
-func (s *Server) Get(from string, key []byte) error {
+func (s *Server) Get(from string, key []byte, index int) error {
 	const op = "server.Get"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
 	peer, ok := s.peers[from]
 	if !ok {
 		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
 	}
-	val, ok := s.kv.Get(key)
+	val, ok := s.Storage.Get(key, index)
 	log.Info("got value for a peer", slog.String("value", string(val)))
 	n := int64(len(val))
 	if !ok {
@@ -145,14 +147,14 @@ func (s *Server) Get(from string, key []byte) error {
 }
 
 // Add increments key value by 1 and writes response about success of the operation
-func (s *Server) Add(from string, key []byte) error {
+func (s *Server) Add(from string, key []byte, index int) error {
 	const op = "server.Add"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
 	peer, ok := s.peers[from]
 	if !ok {
 		return ErrUknownPeer
 	}
-	if err := s.kv.Add(key); err != nil {
+	if err := s.Storage.Add(key, index); err != nil {
 		binary.Write(peer.Conn, binary.BigEndian, false)
 		return fmt.Errorf("%s:%w", op, err)
 	}
@@ -162,14 +164,14 @@ func (s *Server) Add(from string, key []byte) error {
 }
 
 // AddN increments key value by given value and writes response about success of the operation
-func (s *Server) AddN(from string, key []byte, value []byte) error {
+func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 	const op = "server.Add"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
 	peer, ok := s.peers[from]
 	if !ok {
 		return ErrUknownPeer
 	}
-	if err := s.kv.AddN(key, value); err != nil {
+	if err := s.Storage.AddN(key, value, index); err != nil {
 		binary.Write(peer.Conn, binary.BigEndian, false)
 		return fmt.Errorf("%s:%w", op, err)
 	}
@@ -179,14 +181,18 @@ func (s *Server) AddN(from string, key []byte, value []byte) error {
 }
 
 // Delete deletes key
-func (s *Server) Delete(from string, key []byte) error {
+func (s *Server) Delete(from string, key []byte, index int) error {
 	const op = "server.Delete"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
 	peer, ok := s.peers[from]
 	if !ok {
 		return ErrUknownPeer
 	}
-	s.kv.Delete(key)
+	err := s.Storage.Delete(key, index)
+	if err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
 	log.Info("key is deleted")
 	return nil
@@ -204,17 +210,17 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 	}
 	switch v := cmd.(type) {
 	case command.SetCommand:
-		return s.Set(from, v.Key, v.Val)
+		return s.Set(from, v.Key, v.Val, v.Index)
 	case command.GetCommand:
-		return s.Get(from, v.Key)
+		return s.Get(from, v.Key, v.Index)
 	case command.HelloCommand:
 		log.Info("got hello command")
 	case command.AddCommand:
-		return s.Add(from, v.Key)
+		return s.Add(from, v.Key, v.Index)
 	case command.AdddNCommand:
-		return s.AddN(from, v.Key, v.Val)
+		return s.AddN(from, v.Key, v.Val, v.Index)
 	case command.DeleteCommnad:
-		return s.Delete(from, v.Key)
+		return s.Delete(from, v.Key, v.Index)
 	}
 	return nil
 }

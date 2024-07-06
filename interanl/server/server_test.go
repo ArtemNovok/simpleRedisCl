@@ -19,6 +19,7 @@ import (
 func Test_ServerAndClients(t *testing.T) {
 	logger := setUpLogger()
 	addr := ":5555"
+	ind := 0
 	s := SetUpServer(logger, addr)
 	go func() {
 		log.Fatal(s.Start())
@@ -36,9 +37,9 @@ func Test_ServerAndClients(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl.Set(context.Background(), key, val)
+				err := cl.Set(context.Background(), key, val, ind)
 				assert.Nil(t, err)
-				val2, err := cl.Get(context.Background(), key)
+				val2, err := cl.Get(context.Background(), key, ind)
 				assert.Nil(t, err)
 				assert.Equal(t, val, val2)
 			}()
@@ -51,9 +52,9 @@ func Test_ServerAndClients(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := cl.Set(context.Background(), key, val)
+			err := cl.Set(context.Background(), key, val, ind)
 			require.Nil(t, err)
-			val2, err := cl.Get(context.Background(), key)
+			val2, err := cl.Get(context.Background(), key, ind)
 			require.Nil(t, err)
 			require.Equal(t, val, val2)
 		}()
@@ -66,6 +67,7 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 	wg2 := sync.WaitGroup{}
 	logger := setUpLogger()
 	addr := ":8888"
+	ind := 0
 	s := SetUpServer(logger, addr)
 	go func() {
 		log.Fatal(s.Start())
@@ -88,7 +90,7 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 			wg2.Add(1)
 			go func() {
 				defer wg2.Done()
-				err := cl.Set(context.Background(), key, val)
+				err := cl.Set(context.Background(), key, val, ind)
 				assert.Nil(t, err)
 			}()
 		}
@@ -101,7 +103,7 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 			wg2.Add(1)
 			go func() {
 				defer wg2.Done()
-				err := cl2.Set(context.Background(), key, val)
+				err := cl2.Set(context.Background(), key, val, ind)
 				assert.Nil(t, err)
 			}()
 		}
@@ -119,6 +121,7 @@ func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
 	wg := sync.WaitGroup{}
 	logger := setUpLogger()
 	addr := ":3333"
+	ind := 0
 	s := SetUpServer(logger, addr)
 	go func() {
 		log.Fatal(s.Start())
@@ -141,9 +144,9 @@ func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl.Set(context.Background(), key, val)
+				err := cl.Set(context.Background(), key, val, ind)
 				assert.Nil(t, err)
-				_, err = cl.Get(context.Background(), key)
+				_, err = cl.Get(context.Background(), key, ind)
 				assert.Nil(t, err)
 			}()
 		}
@@ -156,9 +159,9 @@ func Test_TwoClientWritesAndReadOneValue(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl2.Set(context.Background(), key, val)
+				err := cl2.Set(context.Background(), key, val, ind)
 				assert.Nil(t, err)
-				_, err = cl.Get(context.Background(), key)
+				_, err = cl.Get(context.Background(), key, ind)
 				assert.Nil(t, err)
 			}()
 		}
@@ -173,6 +176,7 @@ func Test_FiveClient(t *testing.T) {
 	wg := sync.WaitGroup{}
 	logger := setUpLogger()
 	addr := ":4444"
+	ind := 0
 	s := SetUpServer(logger, addr)
 	go func() {
 		log.Fatal(s.Start())
@@ -207,12 +211,12 @@ func Test_FiveClient(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl.Set(context.Background(), key, val)
+				err := cl.Set(context.Background(), key, val, ind)
 				require.Nil(t, err)
 				n := rand.Intn(3)
 				go func() {
 					time.Sleep(time.Duration(n*100) * time.Millisecond)
-					_, err = cl.Get(context.Background(), key)
+					_, err = cl.Get(context.Background(), key, ind)
 					require.Nil(t, err)
 				}()
 			}()
@@ -226,12 +230,12 @@ func Test_FiveClient(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl2.Set(context.Background(), key, val)
+				err := cl2.Set(context.Background(), key, val, ind)
 				require.Nil(t, err)
 				n := rand.Intn(3)
 				go func() {
 					time.Sleep(time.Duration(n*100) * time.Millisecond)
-					_, err = cl2.Get(context.Background(), key)
+					_, err = cl2.Get(context.Background(), key, ind)
 					require.Nil(t, err)
 				}()
 			}()
@@ -245,12 +249,12 @@ func Test_FiveClient(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl3.Set(context.Background(), key, val)
+				err := cl3.Set(context.Background(), key, val, ind)
 				require.Nil(t, err)
 				n := rand.Intn(3)
 				go func() {
 					time.Sleep(time.Duration(n*100) * time.Millisecond)
-					_, err = cl3.Get(context.Background(), key)
+					_, err = cl3.Get(context.Background(), key, ind)
 					require.Nil(t, err)
 				}()
 			}()
@@ -264,12 +268,12 @@ func Test_FiveClient(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl4.Set(context.Background(), key, val)
+				err := cl4.Set(context.Background(), key, val, ind)
 				require.Nil(t, err)
 				n := rand.Intn(3)
 				go func() {
 					time.Sleep(time.Duration(n*100) * time.Millisecond)
-					_, err = cl4.Get(context.Background(), key)
+					_, err = cl4.Get(context.Background(), key, ind)
 					require.Nil(t, err)
 				}()
 			}()
@@ -283,12 +287,12 @@ func Test_FiveClient(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := cl5.Set(context.Background(), key, val)
+				err := cl5.Set(context.Background(), key, val, ind)
 				require.Nil(t, err)
 				n := rand.Intn(3)
 				go func() {
 					time.Sleep(time.Duration(n*100) * time.Millisecond)
-					_, err = cl5.Get(context.Background(), key)
+					_, err = cl5.Get(context.Background(), key, ind)
 					require.Nil(t, err)
 				}()
 			}()
