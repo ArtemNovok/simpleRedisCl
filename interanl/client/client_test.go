@@ -164,33 +164,41 @@ func Test_DataBaseSupport2(t *testing.T) {
 	address := "localhost:6666"
 	wg := sync.WaitGroup{}
 	start := time.Now()
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 400; i++ {
 		cl, err := New(address)
 		require.Nil(t, err)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 10; j++ {
+			for j := 0; j < 100; j++ {
 				value := fmt.Sprintf("value_%v", j)
 				key := fmt.Sprintf("myKey_%v", j)
 				err := cl.Set(context.Background(), key, value, i)
-				require.Nil(t, err)
+				if i > 39 {
+					require.NotNil(t, err)
+				} else {
+					require.Nil(t, err)
+				}
 			}
 		}()
 	}
 	wg.Wait()
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 400; i++ {
 		cl, err := New(address)
 		require.Nil(t, err)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 10; j++ {
+			for j := 0; j < 100; j++ {
 				value := fmt.Sprintf("value_%v", j)
 				key := fmt.Sprintf("myKey_%v", j)
 				val, err := cl.Get(context.Background(), key, i)
-				require.Nil(t, err)
-				require.Equal(t, val, value)
+				if i > 39 {
+					require.NotNil(t, err)
+				} else {
+					require.Nil(t, err)
+					require.Equal(t, val, value)
+				}
 			}
 		}()
 	}

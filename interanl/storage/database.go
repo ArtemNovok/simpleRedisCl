@@ -31,7 +31,7 @@ func NewStorage() *Storage {
 
 func (s *Storage) Set(key []byte, value []byte, index int) error {
 	const op = "storage.Set"
-	if index > 39 && index < 0 {
+	if index > 39 || index < 0 {
 		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
 	}
 	err := s.DBS[index].KV.Set(key, value)
@@ -42,7 +42,7 @@ func (s *Storage) Set(key []byte, value []byte, index int) error {
 }
 
 func (s *Storage) Get(key []byte, index int) ([]byte, bool) {
-	if index > 39 && index < 0 {
+	if index > 39 || index < 0 {
 		return nil, false
 	}
 	return s.DBS[index].KV.Get(key)
@@ -50,7 +50,7 @@ func (s *Storage) Get(key []byte, index int) ([]byte, bool) {
 
 func (s *Storage) Add(key []byte, index int) error {
 	const op = "storage.Add"
-	if index > 39 && index < 0 {
+	if index > 39 || index < 0 {
 		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
 	}
 	err := s.DBS[index].KV.Add(key)
@@ -62,7 +62,7 @@ func (s *Storage) Add(key []byte, index int) error {
 
 func (s *Storage) AddN(key []byte, value []byte, index int) error {
 	const op = "storage.AddN"
-	if index > 39 && index < 0 {
+	if index > 39 || index < 0 {
 		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
 	}
 	err := s.DBS[index].KV.AddN(key, value)
@@ -74,7 +74,7 @@ func (s *Storage) AddN(key []byte, value []byte, index int) error {
 
 func (s *Storage) Delete(key []byte, index int) error {
 	const op = "storage.Delete"
-	if index > 39 && index < 0 {
+	if index > 39 || index < 0 {
 		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
 	}
 	return s.DBS[index].KV.Delete(key)
