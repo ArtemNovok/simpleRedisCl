@@ -21,6 +21,7 @@ var (
 	CommandHas                 = "HAS"
 	CommandDeleteL             = "DELL"
 	CommnaDelElemL             = "DELELEML"
+	CommandDelAll              = "DELALL"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 	ErrInvalidIndexValue       = errors.New("invalid index value")
@@ -30,6 +31,10 @@ type Command interface {
 	// TODO
 }
 
+type DelAllCommnad struct {
+	Key, Val []byte
+	Index    int
+}
 type DeleteLCommnad struct {
 	Key   []byte
 	Index int
@@ -88,6 +93,19 @@ func ParseCommand(rawMsg string) (Command, error) {
 		}
 		if v.Type() == resp.Array {
 			switch v.Array()[0].String() {
+			case CommandDelAll:
+				if len(v.Array()) != 4 {
+					return nil, ErrUnknownCommandArguments
+				}
+				ind, err := strconv.Atoi(v.Array()[3].String())
+				if err != nil {
+					return nil, err
+				}
+				return DelAllCommnad{
+					Key:   v.Array()[1].Bytes(),
+					Val:   v.Array()[2].Bytes(),
+					Index: ind,
+				}, nil
 			case CommandDeleteL:
 				if len(v.Array()) != 3 {
 					return nil, ErrUnknownCommandArguments

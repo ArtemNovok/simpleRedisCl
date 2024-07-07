@@ -66,6 +66,31 @@ func (l *List) DelElmL(key []byte, value []byte) error {
 			break
 		}
 	}
+	if len(newList) == 0 {
+		delete(l.lists, string(key))
+		return nil
+	}
+	l.lists[string(key)] = newList
+	return nil
+}
+
+func (l *List) DelAll(key []byte, value []byte) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	mapList, ok := l.lists[string(key)]
+	if !ok {
+		return ErrKeyDoNotExists
+	}
+	var newList [][]byte
+	for _, val := range mapList {
+		if string(val) != string(value) {
+			newList = append(newList, val)
+		}
+	}
+	if len(newList) == 0 {
+		delete(l.lists, string(key))
+		return nil
+	}
 	l.lists[string(key)] = newList
 	return nil
 }

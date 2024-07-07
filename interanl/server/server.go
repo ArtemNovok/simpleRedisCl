@@ -262,6 +262,24 @@ func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 	log.Info("key value is increment by", slog.String("value", string(value)))
 	return nil
 }
+func (s *Server) DelAll(from string, key []byte, value []byte, index int) error {
+	const op = "server.DelAll"
+	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
+	s.mu.RLock()
+	peer, ok := s.peers[from]
+	s.mu.RUnlock()
+	if !ok {
+		return ErrUknownPeer
+	}
+	err := s.Storage.DelAll(key, value, index)
+	if err != nil {
+		binary.Write(peer.Conn, binary.BigEndian, false)
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	binary.Write(peer.Conn, binary.BigEndian, true)
+	log.Info("all appearances of list value are deleted")
+	return nil
+}
 
 // Delete deletes key
 func (s *Server) Delete(from string, key []byte, index int) error {
@@ -330,6 +348,8 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	switch v := cmd.(type) {
+	case command.DelAllCommnad:
+		return s.DelAll(from, v.Key, v.Val, v.Index)
 	case command.DelElemLCommnad:
 		return s.DelElemL(from, v.Key, v.Val, v.Index)
 	case command.DeleteLCommnad:

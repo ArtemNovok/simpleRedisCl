@@ -19,17 +19,18 @@ const (
 )
 
 var (
-	CommandDelete  = "DEL"
-	CommandSet     = "SET"
-	CommandGet     = "GET"
-	CommnadHello   = "HELLO"
-	CommandAdd     = "ADD"
-	CommandAddN    = "ADDN"
-	CommandLPush   = "LPUSH"
-	CommandGetL    = "GETL"
-	CommandHas     = "HAS"
-	CommandDeleteL = "DELL"
-	CommnaDelElemL = "DELELEML"
+	CommandDelete   = "DEL"
+	CommandSet      = "SET"
+	CommandGet      = "GET"
+	CommandHello    = "HELLO"
+	CommandAdd      = "ADD"
+	CommandAddN     = "ADDN"
+	CommandLPush    = "LPUSH"
+	CommandGetL     = "GETL"
+	CommandHas      = "HAS"
+	CommandDeleteL  = "DELL"
+	CommandDelElemL = "DELELEML"
+	CommandDelAll   = "DELALL"
 	// ErrOperationFailed returned when operation failed not due to context cancel
 	ErrOperationFailed = errors.New("operation failed")
 	// ErrTimeIsOut returned when operation failed due to context cancel
@@ -90,7 +91,52 @@ func New(ctx context.Context, addr string, password string) (*Client, error) {
 		}, nil
 	}
 }
+func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	index := strconv.Itoa(ind)
+	buf := &bytes.Buffer{}
+	wr := resp.NewWriter(buf)
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelAll),
+		resp.StringValue(key),
+		resp.StringValue(value),
+		resp.StringValue(index),
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(c.conn, buf)
+	if err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go func() {
+		var res bool
+		err = binary.Read(c.conn, binary.BigEndian, &res)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if !res {
+			ch <- ErrOperationFailed
+			return
+		}
+		ch <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		return ErrTimeIsOut
+	case err := <-ch:
+		if err != nil {
+			return ErrOperationFailed
+		}
+		return nil
+	}
 
+}
 func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -100,7 +146,7 @@ func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int
 	index := strconv.Itoa(ind)
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommnaDelElemL),
+	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelElemL),
 		resp.StringValue(key),
 		resp.StringValue(value),
 		resp.StringValue(index),

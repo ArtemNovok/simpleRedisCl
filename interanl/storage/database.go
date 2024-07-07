@@ -118,3 +118,11 @@ func (s *Storage) DelElemL(key []byte, value []byte, index int) error {
 	}
 	return s.DBS[index].LST.DelElmL(key, value)
 }
+
+func (s *Storage) DelAll(key []byte, value []byte, index int) error {
+	const op = "storage.DelAll"
+	if index > 39 || index < 0 {
+		return fmt.Errorf("%s:%w", op, ErrInvalidDatabaseIndex)
+	}
+	return s.DBS[index].LST.DelAll(key, value)
+}
