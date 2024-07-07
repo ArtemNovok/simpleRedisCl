@@ -91,6 +91,8 @@ func New(ctx context.Context, addr string, password string) (*Client, error) {
 		}, nil
 	}
 }
+
+// writeRequest writes request with given ind and argument to the server
 func (c *Client) writeRequest(cmd string, ind int, args ...string) error {
 	index := strconv.Itoa(ind)
 	respReq := []resp.Value{resp.StringValue(cmd)}
@@ -111,6 +113,8 @@ func (c *Client) writeRequest(cmd string, ind int, args ...string) error {
 	return nil
 }
 
+// readResponse reads response from server and puts it to the ch chanel for further communication
+// cause this function meant to run in goroutine
 func (c *Client) readResponse(ch chan error) {
 	var res bool
 	err := binary.Read(c.conn, binary.BigEndian, &res)
@@ -124,6 +128,9 @@ func (c *Client) readResponse(ch chan error) {
 	}
 	ch <- nil
 }
+
+// waitForResponse waits for response from server or for context cancellation,
+// returns error if operation failed of context canceled before response is accepted
 func (c *Client) waitForResponse(ch chan error, ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -135,6 +142,8 @@ func (c *Client) waitForResponse(ch chan error, ctx context.Context) error {
 		return nil
 	}
 }
+
+// DelAll deletes all appearances of value in list with key name in database with index ind
 func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -148,6 +157,8 @@ func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) 
 	go c.readResponse(ch)
 	return c.waitForResponse(ch, ctx)
 }
+
+// DelElemL deletes only one element with value from list with key name in database ind
 func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -162,6 +173,7 @@ func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int
 	return c.waitForResponse(ch, ctx)
 }
 
+// DeleteL deletes whole list with name key from database ind
 func (c *Client) DeleteL(ctx context.Context, key string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -176,6 +188,7 @@ func (c *Client) DeleteL(ctx context.Context, key string, ind int) error {
 	return c.waitForResponse(ch, ctx)
 }
 
+// Delete deletes key from database ind
 func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -189,6 +202,8 @@ func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 	go c.readResponse(ch)
 	return c.waitForResponse(ch, ctx)
 }
+
+// GetL returns list key that contains strings
 func (c *Client) GetL(ctx context.Context, key string, ind int) ([]string, error) {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -236,6 +251,8 @@ func (c *Client) GetL(ctx context.Context, key string, ind int) ([]string, error
 		return res, nil
 	}
 }
+
+// Has returns bool that indicate whether list key exist in database ind
 func (c *Client) Has(ctx context.Context, key string, ind int) (bool, error) {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
@@ -263,6 +280,8 @@ func (c *Client) Has(ctx context.Context, key string, ind int) (bool, error) {
 	}
 
 }
+
+// LPush pushes value to list key in database ind, if list doesn't exists it will be created
 func (c *Client) LPush(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
