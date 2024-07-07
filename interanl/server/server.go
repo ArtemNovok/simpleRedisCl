@@ -12,6 +12,7 @@ import (
 
 	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
 	Mypeer "github.com/ArtemNovok/simpleRedisCl/interanl/peer"
+	"github.com/ArtemNovok/simpleRedisCl/interanl/reclogs"
 	"github.com/ArtemNovok/simpleRedisCl/interanl/storage"
 )
 
@@ -34,14 +35,16 @@ type Config struct {
 // Server represents goRedisClone server
 type Server struct {
 	Config
-	mu        sync.RWMutex
-	peers     map[string]*Mypeer.TCPPeer
-	addPeerCh chan *Mypeer.TCPPeer
-	dropPeer  chan string
-	quitCh    chan struct{}
-	msgCh     chan Mypeer.Message
-	listener  net.Listener
-	Storage   *storage.Storage
+	mu             sync.RWMutex
+	peers          map[string]*Mypeer.TCPPeer
+	addPeerCh      chan *Mypeer.TCPPeer
+	dropPeer       chan string
+	quitCh         chan struct{}
+	msgCh          chan Mypeer.Message
+	listener       net.Listener
+	Storage        *storage.Storage
+	recCh          chan command.Command
+	recoveryLogger *reclogs.RecoveryLogger
 }
 
 // NewServer returns server instance with given server Config
@@ -52,7 +55,7 @@ func NewServer(cfg Config) *Server {
 	if len(cfg.Password) == 0 {
 		cfg.Password = defaultPassword
 	}
-	return &Server{
+	s := &Server{
 		Config:    cfg,
 		peers:     make(map[string]*Mypeer.TCPPeer),
 		addPeerCh: make(chan *Mypeer.TCPPeer),
@@ -60,7 +63,11 @@ func NewServer(cfg Config) *Server {
 		quitCh:    make(chan struct{}),
 		msgCh:     make(chan Mypeer.Message),
 		Storage:   storage.NewStorage(),
+		recCh:     make(chan command.Command),
 	}
+	rclger := reclogs.New("logs", s.recCh)
+	s.recoveryLogger = rclger
+	return s
 }
 
 // ShowData shows data if log level is Debug
