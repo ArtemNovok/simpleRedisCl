@@ -342,7 +342,7 @@ func SetUpServerWithPassword(logger *slog.Logger, addr string, password string) 
 	cfg := Config{
 		Log:        logger,
 		ListenAddr: addr,
-		password:   password,
+		Password:   password,
 	}
 	return NewServer(cfg)
 }

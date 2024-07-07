@@ -16,11 +16,13 @@ const (
 func main() {
 	addr := flag.String("listenAddr", server.DefaultAddress, "listen address of the server")
 	lvl := flag.String("loglvl", lvlDebug, "level of the logs ('PROD', 'DEV')")
+	password := flag.String("password", "", "password that used to connect to a server")
 	flag.Parse()
 	logger := setUpLogger(*lvl)
 	cfg := server.Config{
 		Log:        logger,
 		ListenAddr: *addr,
+		Password:   *password,
 	}
 	s := server.NewServer(cfg)
 	s.Start()

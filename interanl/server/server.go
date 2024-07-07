@@ -27,7 +27,7 @@ var (
 
 type Config struct {
 	ListenAddr string
-	password   string
+	Password   string
 	Log        *slog.Logger
 }
 
@@ -49,8 +49,8 @@ func NewServer(cfg Config) *Server {
 	if len(cfg.ListenAddr) == 0 {
 		cfg.ListenAddr = DefaultAddress
 	}
-	if len(cfg.password) == 0 {
-		cfg.password = defaultPassword
+	if len(cfg.Password) == 0 {
+		cfg.Password = defaultPassword
 	}
 	return &Server{
 		Config:    cfg,
@@ -399,7 +399,7 @@ func (s *Server) handleConn(conn net.Conn) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	strPass := string(buf[:n])
-	if s.password != strPass {
+	if s.Password != strPass {
 		log.Error("peer with wrong password", slog.String("password", strPass))
 		binary.Write(conn, binary.BigEndian, false)
 		return fmt.Errorf("%s:%w", op, ErrInvalidPassword)
