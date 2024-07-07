@@ -47,6 +47,8 @@ func Test_CLient3(t *testing.T) {
 	res, err = cl.GetL(ctx, key, ind)
 	require.Nil(t, err)
 	require.Equal(t, res, want)
+	cl.DeleteL(ctx, key, ind)
+	require.Nil(t, err)
 }
 func Test_Client2(t *testing.T) {
 	cl, err := New(ctx, "localhost:6666", "")

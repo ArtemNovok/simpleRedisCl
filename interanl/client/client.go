@@ -91,20 +91,16 @@ func New(ctx context.Context, addr string, password string) (*Client, error) {
 		}, nil
 	}
 }
-func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) error {
-	c.connLock.Lock()
-	defer c.connLock.Unlock()
-	if ind > 39 && ind < 0 {
-		return ErrInvalidIndex
-	}
+func (c *Client) writeRequest(cmd string, ind int, args ...string) error {
 	index := strconv.Itoa(ind)
+	respReq := []resp.Value{resp.StringValue(cmd)}
+	for _, val := range args {
+		respReq = append(respReq, resp.StringValue(val))
+	}
+	respReq = append(respReq, resp.StringValue(index))
 	buf := &bytes.Buffer{}
 	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelAll),
-		resp.StringValue(key),
-		resp.StringValue(value),
-		resp.StringValue(index),
-	})
+	err := wr.WriteArray(respReq)
 	if err != nil {
 		return err
 	}
@@ -112,20 +108,23 @@ func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) 
 	if err != nil {
 		return err
 	}
-	ch := make(chan error)
-	go func() {
-		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
+	return nil
+}
+
+func (c *Client) readResponse(ch chan error) {
+	var res bool
+	err := binary.Read(c.conn, binary.BigEndian, &res)
+	if err != nil {
+		ch <- err
+		return
+	}
+	if !res {
+		ch <- ErrOperationFailed
+		return
+	}
+	ch <- nil
+}
+func (c *Client) waitForResponse(ch chan error, ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ErrTimeIsOut
@@ -135,7 +134,19 @@ func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) 
 		}
 		return nil
 	}
-
+}
+func (c *Client) DelAll(ctx context.Context, key string, value string, ind int) error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
+	if ind > 39 && ind < 0 {
+		return ErrInvalidIndex
+	}
+	if err := c.writeRequest(CommandDelAll, ind, key, value); err != nil {
+		return err
+	}
+	ch := make(chan error)
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int) error {
 	c.connLock.Lock()
@@ -143,45 +154,12 @@ func (c *Client) DelElemL(ctx context.Context, key string, value string, ind int
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelElemL),
-		resp.StringValue(key),
-		resp.StringValue(value),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandDelElemL, ind, key, value); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
-
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 
 func (c *Client) DeleteL(ctx context.Context, key string, ind int) error {
@@ -190,43 +168,12 @@ func (c *Client) DeleteL(ctx context.Context, key string, ind int) error {
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDeleteL),
-		resp.StringValue(key),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandDeleteL, ind, key); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 
 func (c *Client) Delete(ctx context.Context, key string, ind int) error {
@@ -235,35 +182,12 @@ func (c *Client) Delete(ctx context.Context, key string, ind int) error {
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandDelete),
-		resp.StringValue(key),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandDelete, ind, key); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
-		ch <- err
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 func (c *Client) GetL(ctx context.Context, key string, ind int) ([]string, error) {
 	c.connLock.Lock()
@@ -271,18 +195,7 @@ func (c *Client) GetL(ctx context.Context, key string, ind int) ([]string, error
 	if ind > 39 && ind < 0 {
 		return nil, ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandGetL),
-		resp.StringValue(key),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return nil, err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandGetL, ind, key); err != nil {
 		return nil, err
 	}
 	ch := make(chan []string)
@@ -329,24 +242,13 @@ func (c *Client) Has(ctx context.Context, key string, ind int) (bool, error) {
 	if ind > 39 && ind < 0 {
 		return false, ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandHas),
-		resp.StringValue(key),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return false, err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandHas, ind, key); err != nil {
 		return false, err
 	}
 	ch := make(chan bool)
 	go func() {
 		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
+		err := binary.Read(c.conn, binary.BigEndian, &res)
 		if err != nil {
 			ch <- false
 			return
@@ -367,44 +269,12 @@ func (c *Client) LPush(ctx context.Context, key string, value string, ind int) e
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandLPush),
-		resp.StringValue(key),
-		resp.StringValue(value),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandLPush, ind, key, value); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 
 // Set sets key with given value it returns error if ctx is done or operation failed
@@ -414,66 +284,22 @@ func (c *Client) Set(ctx context.Context, key string, value string, ind int) err
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandSet),
-		resp.StringValue(key),
-		resp.StringValue(value),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandSet, ind, key, value); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err = binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 
 // Get reruns key value and  error if ctx is done or operation failed
-
 func (c *Client) Get(ctx context.Context, key string, ind int) (string, error) {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
 	if ind > 39 && ind < 0 {
 		return "", ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandGet),
-		resp.StringValue(key),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return "", err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandGet, ind, key); err != nil {
 		return "", err
 	}
 	ch := make(chan GetResult)
@@ -499,43 +325,12 @@ func (c *Client) Add(ctx context.Context, key string, ind int) error {
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandAdd),
-		resp.StringValue(key),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandAdd, ind, key); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err := binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 
 // AddN increment key value by given value and  returns error if ctx is done or operation failed
@@ -545,44 +340,12 @@ func (c *Client) AddN(ctx context.Context, key string, value string, ind int) er
 	if ind > 39 && ind < 0 {
 		return ErrInvalidIndex
 	}
-	index := strconv.Itoa(ind)
-	buf := &bytes.Buffer{}
-	wr := resp.NewWriter(buf)
-	err := wr.WriteArray([]resp.Value{resp.StringValue(CommandAddN),
-		resp.StringValue(key),
-		resp.StringValue(value),
-		resp.StringValue(index),
-	})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(c.conn, buf)
-	if err != nil {
+	if err := c.writeRequest(CommandAddN, ind, key, value); err != nil {
 		return err
 	}
 	ch := make(chan error)
-	go func() {
-		var res bool
-		err := binary.Read(c.conn, binary.BigEndian, &res)
-		if err != nil {
-			ch <- err
-			return
-		}
-		if !res {
-			ch <- ErrOperationFailed
-			return
-		}
-		ch <- nil
-	}()
-	select {
-	case <-ctx.Done():
-		return ErrTimeIsOut
-	case err := <-ch:
-		if err != nil {
-			return ErrOperationFailed
-		}
-		return nil
-	}
+	go c.readResponse(ch)
+	return c.waitForResponse(ch, ctx)
 }
 
 func (c *Client) Hello(ctx context.Context, m map[string]string) error {
