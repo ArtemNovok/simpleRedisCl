@@ -182,10 +182,14 @@ func (s *Server) LPush(from string, key, val []byte, index int) error {
 	err := s.Storage.LPush(key, val, index)
 	if err != nil {
 		log.Error("failed to append value to a list", slog.String("key", string(key)))
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+			log.Error("got errors after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+		log.Error("got errors after sending response", slog.String("error", err.Error()))
+	}
 	err = s.recoveryLogger.WriteLog(command.CommandLPush, index, key, val)
 	if err != nil {
 		log.Error("got error while logging", slog.String("error", err.Error()))
@@ -204,7 +208,9 @@ func (s *Server) Has(from string, key []byte, index int) error {
 	if !ok {
 		return fmt.Errorf("%s:%w", op, ErrUknownPeer)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, s.Storage.Has(key, index))
+	if err := binary.Write(peer.Conn, binary.BigEndian, s.Storage.Has(key, index)); err != nil {
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	log.Info("Checked whether db has a key", slog.String("key", string(key)))
 	return nil
 }
@@ -221,15 +227,26 @@ func (s *Server) GetL(from string, key []byte, index int) error {
 	}
 	slice, err := s.Storage.GetL(key, index)
 	if err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+			log.Error("got error while logging", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, storage.ErrKeyDoNotExists)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	err = binary.Write(peer.Conn, binary.BigEndian, true)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
 	slLen := int64(len(slice))
-	binary.Write(peer.Conn, binary.BigEndian, slLen)
+	err = binary.Write(peer.Conn, binary.BigEndian, slLen)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
 	for _, sl := range slice {
 		n := int64(len(sl))
-		binary.Write(peer.Conn, binary.BigEndian, n)
+		err = binary.Write(peer.Conn, binary.BigEndian, n)
+		if err != nil {
+			return fmt.Errorf("%s:%w", op, err)
+		}
 		r := bytes.NewReader(sl)
 		_, err := io.Copy(peer.Conn, r)
 		if err != nil {
@@ -294,10 +311,15 @@ func (s *Server) Set(from string, key, val []byte, index int) error {
 	err := s.Storage.Set(key, val, index)
 	if err != nil {
 		log.Error("failed to set a key", slog.String("key", string(key)))
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	err = s.recoveryLogger.WriteLog(command.CommandSet, index, key, val)
 	if err != nil {
 		log.Error("got error while logging", slog.String("error", err.Error()))
@@ -319,14 +341,22 @@ func (s *Server) Get(from string, key []byte, index int) error {
 	val, ok := s.Storage.Get(key, index)
 	log.Info("got value for a peer", slog.String("value", string(val)))
 	if !ok {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, storage.ErrKeyDoNotExists)
 	}
 	n := int64(len(val))
-	binary.Write(peer.Conn, binary.BigEndian, true)
-	binary.Write(peer.Conn, binary.BigEndian, n)
+	err := binary.Write(peer.Conn, binary.BigEndian, true)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	err = binary.Write(peer.Conn, binary.BigEndian, n)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
 	r := bytes.NewReader(val)
-	_, err := io.Copy(peer.Conn, r)
+	_, err = io.Copy(peer.Conn, r)
 	if err != nil {
 		return fmt.Errorf("%s:%w", op, err)
 	}
@@ -345,10 +375,14 @@ func (s *Server) Add(from string, key []byte, index int) error {
 		return ErrUknownPeer
 	}
 	if err := s.Storage.Add(key, index); err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	log.Info("key value is increment by one")
 	err := s.recoveryLogger.WriteLog(command.CommandAdd, index, key)
 	if err != nil {
@@ -368,10 +402,14 @@ func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 		return ErrUknownPeer
 	}
 	if err := s.Storage.AddN(key, value, index); err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	log.Info("key value is increment by", slog.String("value", string(value)))
 	err := s.recoveryLogger.WriteLog(command.CommandAddN, index, key, value)
 	if err != nil {
@@ -399,10 +437,16 @@ func (s *Server) DelAll(from string, key []byte, value []byte, index int) error 
 	}
 	err := s.Storage.DelAll(key, value, index)
 	if err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	err = s.recoveryLogger.WriteLog(command.CommandDelAll, index, key, value)
 	if err != nil {
 		log.Error("got error while logging", slog.String("error", err.Error()))
@@ -423,10 +467,16 @@ func (s *Server) Delete(from string, key []byte, index int) error {
 	}
 	err := s.Storage.Delete(key, index)
 	if err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	log.Info("key is deleted")
 	err = s.recoveryLogger.WriteLog(command.CommandDelete, index, key)
 	if err != nil {
@@ -453,10 +503,16 @@ func (s *Server) DeleteL(from string, key []byte, index int) error {
 	}
 	err := s.Storage.DeleteL(key, index)
 	if err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	err = s.recoveryLogger.WriteLog(command.CommandDeleteL, index, key)
 	if err != nil {
 		log.Error("got error while logging", slog.String("error", err.Error()))
@@ -483,10 +539,17 @@ func (s *Server) DelElemL(from string, key []byte, value []byte, index int) erro
 	}
 	err := s.Storage.DelElemL(key, value, index)
 	if err != nil {
-		binary.Write(peer.Conn, binary.BigEndian, false)
+		if err := binary.Write(peer.Conn, binary.BigEndian, false); err != nil {
+
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
+
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	binary.Write(peer.Conn, binary.BigEndian, true)
+	if err := binary.Write(peer.Conn, binary.BigEndian, true); err != nil {
+
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	err = s.recoveryLogger.WriteLog(command.CommandDelElemL, index, key, value)
 	if err != nil {
 		log.Error("got error while logging", slog.String("error", err.Error()))
@@ -559,10 +622,16 @@ func (s *Server) handleConn(conn net.Conn) error {
 	strPass := string(buf[:n])
 	if s.Password != strPass {
 		log.Error("peer with wrong password", slog.String("password", strPass))
-		binary.Write(conn, binary.BigEndian, false)
+		if err := binary.Write(conn, binary.BigEndian, false); err != nil {
+
+			log.Error("got error after sending response", slog.String("error", err.Error()))
+		}
 		return fmt.Errorf("%s:%w", op, ErrInvalidPassword)
 	}
-	binary.Write(conn, binary.BigEndian, true)
+	if err := binary.Write(conn, binary.BigEndian, true); err != nil {
+
+		log.Error("got error after sending response", slog.String("error", err.Error()))
+	}
 	log.Info("starting handling connection", slog.String("address", conn.RemoteAddr().String()))
 	peer := Mypeer.NewTCPPeer(conn, s.msgCh, s.dropPeer)
 	s.addPeerCh <- peer

@@ -1,0 +1,7 @@
+Makefile
+.gitignore
+/bin
+logs
+README.md
+/interanl/server/logs
+/interanl/reclogs/test

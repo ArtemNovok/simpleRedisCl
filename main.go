@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"log/slog"
 	"os"
 
@@ -25,7 +26,7 @@ func main() {
 		Password:   *password,
 	}
 	s := server.NewServer(cfg)
-	s.Start()
+	log.Fatal(s.Start())
 }
 
 func setUpLogger(lvl string) *slog.Logger {
