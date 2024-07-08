@@ -22,6 +22,7 @@ var (
 	CommandDeleteL             = "DELL"
 	CommnaDelElemL             = "DELELEML"
 	CommandDelAll              = "DELALL"
+	CommnadStop                = "STOP"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 	ErrInvalidIndexValue       = errors.New("invalid index value")
@@ -30,7 +31,8 @@ var (
 type Command interface {
 	// TODO
 }
-
+type StopCommnad struct {
+}
 type DelAllCommnad struct {
 	Key, Val []byte
 	Index    int

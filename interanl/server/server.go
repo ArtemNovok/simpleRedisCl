@@ -86,6 +86,13 @@ func (s *Server) Stop() {
 func (s *Server) Start() error {
 	const op = "server.Start"
 	log := s.Log.With("op", op)
+	// starting data recovery
+	go s.recoveryLogger.ReadLog()
+	if err := s.dataRecoveryLoop(); err != nil {
+		log.Error("got error", slog.String("error", err.Error()))
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	// starting listening
 	ln, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
 		return fmt.Errorf("%s:%w", op, err)
@@ -95,7 +102,23 @@ func (s *Server) Start() error {
 	go s.loop()
 	return s.listenLoop()
 }
-
+func (s *Server) dataRecoveryLoop() error {
+	const op = "server.dataRecoveryLoop"
+	log := s.Log.With(slog.String("op", op))
+	log.Info("starting recover data")
+	for {
+		msg := <-s.recCh
+		switch v := msg.(type) {
+		case command.SetCommand:
+			if err := s.RSet(v.Key, v.Val, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.StopCommnad:
+			log.Info("done data recovey")
+			return nil
+		}
+	}
+}
 func (s *Server) loop() {
 	const op = "server.loop"
 	log := s.Log.With("op", op)
@@ -182,6 +205,15 @@ func (s *Server) GetL(from string, key []byte, index int) error {
 	return nil
 }
 
+func (s *Server) RSet(key, val []byte, index int) error {
+	const op = "server.RSet"
+	err := s.Storage.Set(key, val, index)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
+
 // Set sets the key value and write response to the client with info about operation result
 func (s *Server) Set(from string, key, val []byte, index int) error {
 	const op = "server.Set"
@@ -200,6 +232,10 @@ func (s *Server) Set(from string, key, val []byte, index int) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
+	err = s.recoveryLogger.WriteLog(command.CommandSet, index, key, val)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	log.Info("key is sett")
 	return nil
 }

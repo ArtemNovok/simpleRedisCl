@@ -16,6 +16,15 @@ import (
 // on right address (localhost:6666), or change address manually in every test
 var ctx context.Context = context.Background()
 
+func Test_Recovery(t *testing.T) {
+	cl, err := New(ctx, "localhost:6666", "")
+	require.Nil(t, err)
+	key := "my_key"
+	ind := 0
+	_, err = cl.Get(context.Background(), key, ind)
+	require.Nil(t, err)
+
+}
 func Test_CLient3(t *testing.T) {
 	cl, err := New(ctx, "localhost:6666", "")
 	require.Nil(t, err)

@@ -56,6 +56,9 @@ func (r *RecoveryLogger) ReadLog() error {
 	scaner := bufio.NewScanner(f)
 	for scaner.Scan() {
 		attrs := strings.Split(scaner.Text(), "#")
+		if len(attrs) < 4 {
+			break
+		}
 		attrs = attrs[:len(attrs)-1]
 		cmd, err := parseCommand(attrs)
 		if err != nil {
@@ -66,6 +69,7 @@ func (r *RecoveryLogger) ReadLog() error {
 	if err := scaner.Err(); err != nil {
 		return err
 	}
+	r.recData <- command.StopCommnad{}
 	return nil
 }
 

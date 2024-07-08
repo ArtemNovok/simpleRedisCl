@@ -2,6 +2,7 @@ package reclogs
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
@@ -10,19 +11,20 @@ import (
 
 func Test_WriteLog(t *testing.T) {
 	ch := make(chan command.Command)
-	st := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
-			select {
-			case msg := <-ch:
-				switch msg.(type) {
-				case command.SetCommand:
-					fmt.Println("got set command")
-				}
-			case <-st:
+			msg := <-ch
+			switch msg.(type) {
+			case command.SetCommand:
+				fmt.Println("got set command")
+			case command.StopCommnad:
 				fmt.Println("done")
 				return
 			}
+
 		}
 	}()
 	r := New("test", ch)
@@ -30,5 +32,5 @@ func Test_WriteLog(t *testing.T) {
 	require.Nil(t, err)
 	err = r.ReadLog()
 	require.Nil(t, err)
-
+	wg.Wait()
 }
