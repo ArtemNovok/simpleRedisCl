@@ -121,11 +121,27 @@ func (s *Server) dataRecoveryLoop() error {
 			if err := s.RAddN(v.Key, v.Val, v.Index); err != nil {
 				return fmt.Errorf("%s:%w", op, err)
 			}
-		case command.DeleteCommnad:
+		case command.DeleteCommand:
 			if err := s.RDelete(v.Key, v.Index); err != nil {
 				return fmt.Errorf("%s:%w", op, err)
 			}
-		case command.StopCommnad:
+		case command.LPushCommand:
+			if err := s.RLPush(v.Key, v.Val, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.DeleteLCommand:
+			if err := s.RDeleteL(v.Key, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.DelAllCommand:
+			if err := s.RDelAll(v.Key, v.Val, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.DelElemLCommand:
+			if err := s.RDelElemL(v.Key, v.Val, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.StopCommand:
 			log.Info("done data recovey")
 			return nil
 		}
@@ -169,6 +185,10 @@ func (s *Server) LPush(from string, key, val []byte, index int) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
+	err = s.recoveryLogger.WriteLog(command.CommandLPush, index, key, val)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	log.Info("value is appended to a list")
 	return nil
 }
@@ -216,22 +236,30 @@ func (s *Server) GetL(from string, key []byte, index int) error {
 	log.Info("list is sended")
 	return nil
 }
+func (s *Server) RLPush(key, val []byte, index int) error {
+	const op = "server.RLPush"
+	err := s.Storage.LPush(key, val, index)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
 func (s *Server) RAddN(key []byte, value []byte, index int) error {
-	const op = "server.Add"
+	const op = "server.RAddN"
 	if err := s.Storage.AddN(key, value, index); err != nil {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	return nil
 }
 func (s *Server) RAdd(key []byte, index int) error {
-	const op = "server.Add"
+	const op = "server.RAdd"
 	if err := s.Storage.Add(key, index); err != nil {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	return nil
 }
 func (s *Server) RDelete(key []byte, index int) error {
-	const op = "server.Delete"
+	const op = "server.RDelete"
 	err := s.Storage.Delete(key, index)
 	if err != nil {
 		return fmt.Errorf("%s:%w", op, err)
@@ -328,7 +356,7 @@ func (s *Server) Add(from string, key []byte, index int) error {
 
 // AddN increments key value by given value and writes response about success of the operation
 func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
-	const op = "server.Add"
+	const op = "server.AddN"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
 	s.mu.RLock()
 	peer, ok := s.peers[from]
@@ -348,6 +376,15 @@ func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 	}
 	return nil
 }
+
+func (s *Server) RDelAll(key []byte, value []byte, index int) error {
+	const op = "server.RDelAll"
+	err := s.Storage.DelAll(key, value, index)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
 func (s *Server) DelAll(from string, key []byte, value []byte, index int) error {
 	const op = "server.DelAll"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -363,6 +400,10 @@ func (s *Server) DelAll(from string, key []byte, value []byte, index int) error 
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
+	err = s.recoveryLogger.WriteLog(command.CommandDelAll, index, key, value)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	log.Info("all appearances of list value are deleted")
 	return nil
 }
@@ -390,6 +431,14 @@ func (s *Server) Delete(from string, key []byte, index int) error {
 	}
 	return nil
 }
+func (s *Server) RDeleteL(key []byte, index int) error {
+	const op = "server.RDeleteL"
+	err := s.Storage.DeleteL(key, index)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
 func (s *Server) DeleteL(from string, key []byte, index int) error {
 	const op = "server.DeleteL"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -405,7 +454,19 @@ func (s *Server) DeleteL(from string, key []byte, index int) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
+	err = s.recoveryLogger.WriteLog(command.CommandDeleteL, index, key)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	log.Info("list is deleted")
+	return nil
+}
+func (s *Server) RDelElemL(key []byte, value []byte, index int) error {
+	const op = "storage.DelElemL"
+	err := s.Storage.DelElemL(key, value, index)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
 	return nil
 }
 func (s *Server) DelElemL(from string, key []byte, value []byte, index int) error {
@@ -423,6 +484,10 @@ func (s *Server) DelElemL(from string, key []byte, value []byte, index int) erro
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
+	err = s.recoveryLogger.WriteLog(command.CommandDelElemL, index, key, value)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	log.Info("list value is deleted")
 	return nil
 }
@@ -438,11 +503,11 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return fmt.Errorf("%s:%w", op, err)
 	}
 	switch v := cmd.(type) {
-	case command.DelAllCommnad:
+	case command.DelAllCommand:
 		return s.DelAll(from, v.Key, v.Val, v.Index)
-	case command.DelElemLCommnad:
+	case command.DelElemLCommand:
 		return s.DelElemL(from, v.Key, v.Val, v.Index)
-	case command.DeleteLCommnad:
+	case command.DeleteLCommand:
 		return s.DeleteL(from, v.Key, v.Index)
 	case command.LPushCommand:
 		return s.LPush(from, v.Key, v.Val, v.Index)
@@ -460,7 +525,7 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		return s.Add(from, v.Key, v.Index)
 	case command.AddNCommand:
 		return s.AddN(from, v.Key, v.Val, v.Index)
-	case command.DeleteCommnad:
+	case command.DeleteCommand:
 		return s.Delete(from, v.Key, v.Index)
 	}
 	return nil

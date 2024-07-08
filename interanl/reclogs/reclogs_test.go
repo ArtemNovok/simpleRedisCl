@@ -22,7 +22,7 @@ func Test_WriteLog(t *testing.T) {
 				fmt.Println("got set command")
 			case command.AddCommand:
 				fmt.Println("got add command")
-			case command.StopCommnad:
+			case command.StopCommand:
 				fmt.Println("done")
 				return
 			}

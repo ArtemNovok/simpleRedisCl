@@ -12,7 +12,7 @@ import (
 var (
 	CommandSet                 = "SET"
 	CommandGet                 = "GET"
-	CommnadHello               = "HELLO"
+	CommandHello               = "HELLO"
 	CommandAdd                 = "ADD"
 	CommandAddN                = "ADDN"
 	CommandDelete              = "DEL"
@@ -20,9 +20,9 @@ var (
 	CommandGetL                = "GETL"
 	CommandHas                 = "HAS"
 	CommandDeleteL             = "DELL"
-	CommnaDelElemL             = "DELELEML"
+	CommandDelElemL            = "DELELEML"
 	CommandDelAll              = "DELALL"
-	CommnadStop                = "STOP"
+	CommandStop                = "STOP"
 	ErrUnknownCommand          = errors.New("unknown command")
 	ErrUnknownCommandArguments = errors.New("unknown command arguments")
 	ErrInvalidIndexValue       = errors.New("invalid index value")
@@ -31,17 +31,17 @@ var (
 type Command interface {
 	// TODO
 }
-type StopCommnad struct {
+type StopCommand struct {
 }
-type DelAllCommnad struct {
+type DelAllCommand struct {
 	Key, Val []byte
 	Index    int
 }
-type DeleteLCommnad struct {
+type DeleteLCommand struct {
 	Key   []byte
 	Index int
 }
-type DelElemLCommnad struct {
+type DelElemLCommand struct {
 	Key, Val []byte
 	Index    int
 }
@@ -78,7 +78,7 @@ type HelloCommand struct {
 	value string
 	Index int
 }
-type DeleteCommnad struct {
+type DeleteCommand struct {
 	Key   []byte
 	Index int
 }
@@ -103,7 +103,7 @@ func ParseCommand(rawMsg string) (Command, error) {
 				if err != nil {
 					return nil, err
 				}
-				return DelAllCommnad{
+				return DelAllCommand{
 					Key:   v.Array()[1].Bytes(),
 					Val:   v.Array()[2].Bytes(),
 					Index: ind,
@@ -116,11 +116,11 @@ func ParseCommand(rawMsg string) (Command, error) {
 				if err != nil {
 					return nil, err
 				}
-				return DeleteLCommnad{
+				return DeleteLCommand{
 					Key:   v.Array()[1].Bytes(),
 					Index: ind,
 				}, nil
-			case CommnaDelElemL:
+			case CommandDelElemL:
 				if len(v.Array()) != 4 {
 					return nil, ErrUnknownCommandArguments
 				}
@@ -128,7 +128,7 @@ func ParseCommand(rawMsg string) (Command, error) {
 				if err != nil {
 					return nil, err
 				}
-				return DelElemLCommnad{
+				return DelElemLCommand{
 					Key:   v.Array()[1].Bytes(),
 					Val:   v.Array()[2].Bytes(),
 					Index: ind,
@@ -229,11 +229,11 @@ func ParseCommand(rawMsg string) (Command, error) {
 				if err != nil {
 					return nil, err
 				}
-				return DeleteCommnad{
+				return DeleteCommand{
 					Key:   v.Array()[1].Bytes(),
 					Index: ind,
 				}, nil
-			case CommnadHello:
+			case CommandHello:
 				return HelloCommand{
 					value: v.Array()[1].String(),
 				}, nil

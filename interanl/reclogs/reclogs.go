@@ -69,7 +69,7 @@ func (r *RecoveryLogger) ReadLog() error {
 	if err := scaner.Err(); err != nil {
 		return err
 	}
-	r.recData <- command.StopCommnad{}
+	r.recData <- command.StopCommand{}
 	return nil
 }
 
@@ -109,8 +109,47 @@ func parseCommand(attrs []string) (command.Command, error) {
 		if err != nil {
 			return nil, command.ErrInvalidIndexValue
 		}
-		return command.DeleteCommnad{
+		return command.DeleteCommand{
 			Key:   []byte(attrs[2]),
+			Index: ind,
+		}, nil
+	case command.CommandLPush:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.LPushCommand{
+			Key:   []byte(attrs[2]),
+			Val:   []byte(attrs[3]),
+			Index: ind,
+		}, nil
+	case command.CommandDelElemL:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.DelElemLCommand{
+			Key:   []byte(attrs[2]),
+			Val:   []byte(attrs[3]),
+			Index: ind,
+		}, nil
+	case command.CommandDeleteL:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.DeleteLCommand{
+			Key:   []byte(attrs[2]),
+			Index: ind,
+		}, nil
+	case command.CommandDelAll:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.DelAllCommand{
+			Key:   []byte(attrs[2]),
+			Val:   []byte(attrs[3]),
 			Index: ind,
 		}, nil
 	default:
