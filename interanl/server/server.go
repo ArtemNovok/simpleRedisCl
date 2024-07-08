@@ -169,6 +169,7 @@ func (s *Server) loop() {
 	}
 }
 
+// LPush pushes value to a list with name key
 func (s *Server) LPush(from string, key, val []byte, index int) error {
 	const op = "server.LPush"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -193,6 +194,7 @@ func (s *Server) LPush(from string, key, val []byte, index int) error {
 	return nil
 }
 
+// Has checks whether key exists or not
 func (s *Server) Has(from string, key []byte, index int) error {
 	const op = "server.Has"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
@@ -207,6 +209,7 @@ func (s *Server) Has(from string, key []byte, index int) error {
 	return nil
 }
 
+// GetL returns list with key name to a client
 func (s *Server) GetL(from string, key []byte, index int) error {
 	const op = "server.GetL"
 	log := s.Log.With(slog.String("op", op), slog.String("peer address", from))
