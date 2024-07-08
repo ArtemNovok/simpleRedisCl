@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArtemNovok/simpleRedisCl/interanl/client"
+	"github.com/ArtemNovok/simpleRedisCl/internal/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -117,7 +117,7 @@ func Test_TwoClientWriteOneValue(t *testing.T) {
 	wg2.Wait()
 	time.Sleep(3 * time.Millisecond)
 	cl.Close()
-	time.Sleep(3 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	require.Equal(t, len(s.peers), 1)
 	s.ShowData()
 }

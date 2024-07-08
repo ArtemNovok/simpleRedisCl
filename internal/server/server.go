@@ -10,10 +10,10 @@ import (
 	"net"
 	"sync"
 
-	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
-	Mypeer "github.com/ArtemNovok/simpleRedisCl/interanl/peer"
-	"github.com/ArtemNovok/simpleRedisCl/interanl/reclogs"
-	"github.com/ArtemNovok/simpleRedisCl/interanl/storage"
+	"github.com/ArtemNovok/simpleRedisCl/internal/command"
+	Mypeer "github.com/ArtemNovok/simpleRedisCl/internal/peer"
+	"github.com/ArtemNovok/simpleRedisCl/internal/reclogs"
+	"github.com/ArtemNovok/simpleRedisCl/internal/storage"
 )
 
 const (

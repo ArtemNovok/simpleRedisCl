@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/ArtemNovok/simpleRedisCl/interanl/server"
+	"github.com/ArtemNovok/simpleRedisCl/internal/server"
 )
 
 const (

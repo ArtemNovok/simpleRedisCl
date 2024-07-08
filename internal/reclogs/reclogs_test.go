@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
+	"github.com/ArtemNovok/simpleRedisCl/internal/command"
 	"github.com/stretchr/testify/require"
 )
 

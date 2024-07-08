@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ArtemNovok/simpleRedisCl/interanl/command"
+	"github.com/ArtemNovok/simpleRedisCl/internal/command"
 )
 
 type RecoveryLogger struct {

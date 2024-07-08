@@ -10,7 +10,10 @@ This is a simple Redis clone written in go that supports keys and lists with the
 - data recovery for persistent data 
 - context support for the client
 - databases support (40)
-
+## Client installation 
+```bash
+ go get github.com/ArtemNovok/simpleRedisCl/internal/client
+```
 ## How to run
 
 To run this project you can do multiple things 
@@ -28,5 +31,6 @@ Make sure you don't have images with the name rediscl and containers with the na
 ```bash
   make docker_rm 
 ```
+
 ## Why I made it 
 I'm relatively new in programming and go, so I decided to write Redis which I used in my previous projects, but simple and small. I found it really helpful and interesting, would like to see any feedback on it. Thanks! 
