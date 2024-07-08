@@ -10,7 +10,7 @@ This is a simple Redis clone written in go that supports keys and lists with the
 - data recovery for persistent data 
 - context support for the client
 - databases support (40)
-## Client installation 
+## Installation 
 ```bash
  go get github.com/ArtemNovok/simpleRedisCl 
 ```
