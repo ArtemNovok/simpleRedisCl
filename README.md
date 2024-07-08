@@ -12,7 +12,7 @@ This is a simple Redis clone written in go that supports keys and lists with the
 - databases support (40)
 ## Client installation 
 ```bash
- go get github.com/ArtemNovok/simpleRedisCl/internal/client
+ go get github.com/ArtemNovok/simpleRedisCl 
 ```
 ## How to run
 
