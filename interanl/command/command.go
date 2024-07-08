@@ -69,7 +69,7 @@ type AddCommand struct {
 	Key   []byte
 	Index int
 }
-type AdddNCommand struct {
+type AddNCommand struct {
 	Key   []byte
 	Val   []byte
 	Index int
@@ -216,7 +216,7 @@ func ParseCommand(rawMsg string) (Command, error) {
 				if err != nil {
 					return nil, err
 				}
-				return AdddNCommand{
+				return AddNCommand{
 					Key:   v.Array()[1].Bytes(),
 					Val:   v.Array()[2].Bytes(),
 					Index: ind,

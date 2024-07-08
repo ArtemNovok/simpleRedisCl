@@ -113,6 +113,18 @@ func (s *Server) dataRecoveryLoop() error {
 			if err := s.RSet(v.Key, v.Val, v.Index); err != nil {
 				return fmt.Errorf("%s:%w", op, err)
 			}
+		case command.AddCommand:
+			if err := s.RAdd(v.Key, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.AddNCommand:
+			if err := s.RAddN(v.Key, v.Val, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
+		case command.DeleteCommnad:
+			if err := s.RDelete(v.Key, v.Index); err != nil {
+				return fmt.Errorf("%s:%w", op, err)
+			}
 		case command.StopCommnad:
 			log.Info("done data recovey")
 			return nil
@@ -204,7 +216,30 @@ func (s *Server) GetL(from string, key []byte, index int) error {
 	log.Info("list is sended")
 	return nil
 }
+func (s *Server) RAddN(key []byte, value []byte, index int) error {
+	const op = "server.Add"
+	if err := s.Storage.AddN(key, value, index); err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
+func (s *Server) RAdd(key []byte, index int) error {
+	const op = "server.Add"
+	if err := s.Storage.Add(key, index); err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
+func (s *Server) RDelete(key []byte, index int) error {
+	const op = "server.Delete"
+	err := s.Storage.Delete(key, index)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	return nil
+}
 
+// RSet sets key and value but don't write response to client, used for data recovery
 func (s *Server) RSet(key, val []byte, index int) error {
 	const op = "server.RSet"
 	err := s.Storage.Set(key, val, index)
@@ -284,6 +319,10 @@ func (s *Server) Add(from string, key []byte, index int) error {
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
 	log.Info("key value is increment by one")
+	err := s.recoveryLogger.WriteLog(command.CommandAdd, index, key)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	return nil
 }
 
@@ -303,6 +342,10 @@ func (s *Server) AddN(from string, key []byte, value []byte, index int) error {
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
 	log.Info("key value is increment by", slog.String("value", string(value)))
+	err := s.recoveryLogger.WriteLog(command.CommandAddN, index, key, value)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	return nil
 }
 func (s *Server) DelAll(from string, key []byte, value []byte, index int) error {
@@ -341,6 +384,10 @@ func (s *Server) Delete(from string, key []byte, index int) error {
 	}
 	binary.Write(peer.Conn, binary.BigEndian, true)
 	log.Info("key is deleted")
+	err = s.recoveryLogger.WriteLog(command.CommandDelete, index, key)
+	if err != nil {
+		log.Error("got error while logging", slog.String("error", err.Error()))
+	}
 	return nil
 }
 func (s *Server) DeleteL(from string, key []byte, index int) error {
@@ -411,7 +458,7 @@ func (s *Server) handleRawMessage(from string, msg []byte) error {
 		log.Info("got hello command")
 	case command.AddCommand:
 		return s.Add(from, v.Key, v.Index)
-	case command.AdddNCommand:
+	case command.AddNCommand:
 		return s.AddN(from, v.Key, v.Val, v.Index)
 	case command.DeleteCommnad:
 		return s.Delete(from, v.Key, v.Index)

@@ -85,6 +85,34 @@ func parseCommand(attrs []string) (command.Command, error) {
 			Val:   []byte(attrs[3]),
 			Index: ind,
 		}, nil
+	case command.CommandAdd:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.AddCommand{
+			Key:   []byte(attrs[2]),
+			Index: ind,
+		}, nil
+	case command.CommandAddN:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.AddNCommand{
+			Key:   []byte(attrs[2]),
+			Val:   []byte(attrs[3]),
+			Index: ind,
+		}, nil
+	case command.CommandDelete:
+		ind, err := strconv.Atoi(attrs[1])
+		if err != nil {
+			return nil, command.ErrInvalidIndexValue
+		}
+		return command.DeleteCommnad{
+			Key:   []byte(attrs[2]),
+			Index: ind,
+		}, nil
 	default:
 		return nil, command.ErrUnknownCommand
 	}

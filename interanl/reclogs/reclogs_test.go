@@ -20,6 +20,8 @@ func Test_WriteLog(t *testing.T) {
 			switch msg.(type) {
 			case command.SetCommand:
 				fmt.Println("got set command")
+			case command.AddCommand:
+				fmt.Println("got add command")
 			case command.StopCommnad:
 				fmt.Println("done")
 				return
@@ -29,6 +31,8 @@ func Test_WriteLog(t *testing.T) {
 	}()
 	r := New("test", ch)
 	err := r.WriteLog("SET", 0, []byte("my_key"), []byte("myval"))
+	require.Nil(t, err)
+	err = r.WriteLog("ADD", 0, []byte("my_key"))
 	require.Nil(t, err)
 	err = r.ReadLog()
 	require.Nil(t, err)
